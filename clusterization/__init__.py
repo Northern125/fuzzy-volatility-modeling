@@ -1,1 +1,1 @@
-from all_methods import cluster_input
+from all_methods import cluster_data
