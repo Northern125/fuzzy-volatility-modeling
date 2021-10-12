@@ -1,6 +1,7 @@
 import logging
 
 from clusterization.membership_functions import calc_membership_degree
+from gaussian import calc_gaussian_membership_degrees
 
 
 def cluster_data(x, method: str = 'gaussian', parameters: dict = None):
@@ -20,8 +21,10 @@ def cluster_data(x, method: str = 'gaussian', parameters: dict = None):
         if parameters is not None:
             logger.debug('parameters is not None')
 
-            # TODO this is wrong - this is a logic for just 1 cluster; need to write logic for all clusters
-            membership_degrees = calc_membership_degree(x, membership_function_type=method, parameters=parameters)
+            centers = parameters['centers']
+            cov_matrices = parameters['cov_matrices']
+            membership_degrees = calc_gaussian_membership_degrees(x, centers, cov_matrices)
+
             result = {'parameters': parameters, 'membership': membership_degrees}
         else:
             logger.debug('parameters is None')
