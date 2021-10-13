@@ -5,6 +5,12 @@
     {
       "p": 1,
       "q": 1
+    },
+    "clusterization_parameters":
+    {
+      "n_clusters": 3,
+      "centers": "",
+      "cov_matrices": ""
     }
   }
 }

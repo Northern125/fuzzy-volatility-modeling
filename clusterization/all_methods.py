@@ -1,6 +1,5 @@
 import logging
 
-from clusterization.membership_functions import calc_membership_degree
 from gaussian import calc_gaussian_membership_degrees
 
 

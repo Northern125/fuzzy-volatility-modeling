@@ -46,6 +46,6 @@ def train(input_data,
     # aggregating rules outputs to a single output
     logger.debug('Starting to aggregate all rules outputs to a single one')
 
-    combined_output = combine_rules_outputs(rules_outputs, )
+    combined_output = combine_rules_outputs(rules_outputs, membership_degrees)
 
-    pass
+    return combined_output
