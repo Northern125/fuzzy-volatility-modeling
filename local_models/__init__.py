@@ -1,1 +1,1 @@
-from all_models import apply_local_model
+from .all_models import apply_local_model

@@ -1,6 +1,6 @@
 import logging
 
-from gaussian import calc_gaussian_membership_degrees
+from .gaussian import calc_gaussian_membership_degrees
 
 
 def cluster_data(x, method: str = 'gaussian', parameters: dict = None):
