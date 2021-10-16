@@ -6,12 +6,12 @@ from rules_related import combine_rules_outputs
 from clusterization import cluster_data
 
 
-def train(input_data,
-          clusterization_method: str = 'gaussian',
-          clusterization_parameters: dict = None,
-          local_method: str = 'garch',
-          local_method_parameters: dict = None):
-    logger = logging.getLogger('train')
+def train_model(input_data,
+                clusterization_method: str = 'gaussian',
+                clusterization_parameters: dict = None,
+                local_method: str = 'garch',
+                local_method_parameters: dict = None):
+    logger = logging.getLogger('train_model')
 
     # clusterization
     logger.debug('Starting clusterization')
@@ -19,9 +19,11 @@ def train(input_data,
     clusterization_result = cluster_data(input_data,
                                          method=clusterization_method,
                                          parameters=clusterization_parameters)
+
     clusters_parameters = clusterization_result['parameters']
     n_clusters = clusters_parameters['n_clusters']
-    membership_degrees = clusters_parameters['membership']
+
+    membership_degrees = clusterization_result['membership']
 
     logger.debug(f'Clusterization completed\n'
                  f'Estimated parameters: {clusters_parameters}\n'
@@ -35,7 +37,7 @@ def train(input_data,
         rule_output = apply_local_model(input_data,
                                         method=local_method,
                                         parameters=local_method_parameters,
-                                        forecast_horizon=1)
+                                        forecast_horizon=1)['forecast']
         rules_outputs.append(rule_output)
 
     rules_outputs = array(rules_outputs)
