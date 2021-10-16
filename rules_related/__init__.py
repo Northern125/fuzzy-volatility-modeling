@@ -1,1 +1,1 @@
-from aggregation import combine_rules_outputs
+from .aggregation import combine_rules_outputs
