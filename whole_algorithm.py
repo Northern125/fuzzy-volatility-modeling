@@ -7,10 +7,9 @@ from clusterization import cluster_data
 
 
 def train(input_data,
-          actual_output,
           clusterization_method: str = 'gaussian',
           clusterization_parameters: dict = None,
-          local_method='garch',
+          local_method: str = 'garch',
           local_method_parameters: dict = None):
     logger = logging.getLogger('train')
 
