@@ -18,8 +18,8 @@ class TestAggregation(unittest.TestCase):
 
         round_to = 5
 
-        self.assertEqual(round(result, round_to), round(random_number, round_to),
-                         f'result = {result}, random_number = {random_number}')
+        self.assertAlmostEqual(result, random_number, places=round_to,
+                               msg=f'result = {result}, random_number = {random_number}')
 
 
 if __name__ == '__main__':
