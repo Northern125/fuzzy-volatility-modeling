@@ -4,11 +4,6 @@ import logging
 
 
 class LongMultivariateNormal(multivariate_normal_frozen):
-    # def __init__(self, seed=None):
-    #     super().__init__(seed=seed)
-
-    # def __call__(self, *args, **kwargs):
-
     def pdf(self, x, mean=None, cov=1, allow_singular=False):
         logger = logging.getLogger('pdf')
 
