@@ -50,3 +50,24 @@ def train_model(input_data,
     combined_output = combine_rules_outputs(rules_outputs, membership_degrees)
 
     return combined_output
+
+
+def testing_with_retraining(train_data, test_data=None, n_test=None):
+    logger = logging.getLogger('testing_with_retraining')
+
+    train_data = array(train_data).copy()
+
+    if test_data is not None:
+        test_data = array(test_data).copy()
+    else:
+        if n_test is not None:
+            test_data = train_data[-n_test:].copy()
+            train_data = train_data[:-n_test].copy()
+        else:
+            logger.exception('Either test_data or n_test should be not None; exiting')
+            return
+
+    logger.debug(f'test_data: {test_data}\n'
+                 f'train_data: {train_data}')
+
+    pass
