@@ -30,7 +30,7 @@ class FuzzyVolatilityModel:
         else:
             self.train_data = train_data.copy()
 
-        self.clusters_parameters = None
+        self.clusters_parameters_current = None
         self.membership_degrees_current = None
 
         self._rules_outputs_hist = empty((0, self.clusterization_parameters['n_clusters']), dtype=float)
@@ -64,13 +64,13 @@ class FuzzyVolatilityModel:
                                              method=self.clusterization_method,
                                              parameters=self.clusterization_parameters)
 
-        self.clusters_parameters = clusterization_result['parameters']
-        n_clusters = self.clusters_parameters['n_clusters']
+        self.clusters_parameters_current = clusterization_result['parameters']
+        n_clusters = self.clusters_parameters_current['n_clusters']
 
         self.membership_degrees_current = clusterization_result['membership']
 
         self.logger.debug(f'Clusterization completed\n'
-                          f'Estimated parameters: {self.clusters_parameters}\n'
+                          f'Estimated parameters: {self.clusters_parameters_current}\n'
                           f'Membership degrees:\n{self.membership_degrees_current}')
 
         # running local models for each rule
@@ -81,7 +81,8 @@ class FuzzyVolatilityModel:
             rule_output = apply_local_model(train_data,
                                             method=self.local_method,
                                             parameters=self.local_method_parameters,
-                                            forecast_horizon=1)['forecast']
+                                            forecast_horizon=1)['forecast'][0]  # yes, hardcode:
+            # we only forecast for the next day, it is a common practice
             self.rules_outputs_current.append(rule_output)
 
         rules_outputs_current = array(self.rules_outputs_current)
@@ -89,7 +90,7 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'Local model runs for each rule are completed. rules_outputs_current: '
                           f'{self.rules_outputs_current}')
 
-        self._rules_outputs_hist = append(self._rules_outputs_hist, [rules_outputs_current])
+        self._rules_outputs_hist = append(self._rules_outputs_hist, [rules_outputs_current], axis=0).copy()
 
         # aggregating rules outputs to a single output
         self.logger.debug('Starting to aggregate all rules outputs to a single one')
