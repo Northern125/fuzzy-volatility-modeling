@@ -78,7 +78,7 @@ class FuzzyVolatilityModel:
 
         self.rules_outputs_current = []
         for i in range(n_clusters):
-            rule_output = apply_local_model(train_data,
+            rule_output = apply_local_model(self.train_data,
                                             method=self.local_method,
                                             parameters=self.local_method_parameters,
                                             forecast_horizon=1)['forecast'][0]  # yes, hardcode:
