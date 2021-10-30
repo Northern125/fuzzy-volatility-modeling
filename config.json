@@ -12,5 +12,10 @@
       "centers": "",
       "cov_matrices": ""
     }
+  },
+  "files_folders":
+  {
+    "source":  "files",
+    "processed": "processed_files"
   }
 }
