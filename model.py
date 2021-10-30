@@ -112,10 +112,13 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'Rules outputs are combined; current_output: {self.current_output}')
         self._hist_output.append(self.current_output)
 
-    def push(self, observation):
+    def push(self, observation: float, observation_date):
         # TODO write push logic
-        pass
+        self.train_data.loc[observation_date] = observation
+        self.fit()
 
-    def forecast(self, test_data):
+    def forecast(self, test_data: Series):
         # TODO write forecast logic
-        pass
+        for date in test_data.index:
+            observation = test_data.loc[date]
+            self.push(observation, date)
