@@ -30,15 +30,25 @@ class FuzzyVolatilityModel:
         else:
             self.train_data = train_data.copy()
 
+        # clusters parameters
+        self._clusters_parameters_hist = []
+        self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
+
+        # membership degrees
+        self._membership_degrees_hist = []
+        self.membership_degrees_hist = DataFrame(dtype=float).copy()
         self.membership_degrees_current = None
 
-        self._rules_outputs_hist = empty((0, self.clusterization_parameters['n_clusters']), dtype=float)
+        # rules outputs
+        self._rules_outputs_hist = []  # empty((0, self.clusterization_parameters['n_clusters']), dtype=float)
         self.rules_outputs_hist = DataFrame(dtype=float).copy()
         self.rules_outputs_current = None
 
-        self.current_output = None
+        # combined output
+        self._hist_output = []
         self.hist_output = Series(dtype=float).copy()
+        self.current_output = None
 
         # if test_data is not None:
         #     self.test_data = test_data.copy()
@@ -52,8 +62,7 @@ class FuzzyVolatilityModel:
         # self.logger.debug(f'test_data: {test_data}\n'
         #                   f'train_data: {train_data}')
 
-    def train(self, train_data: Series = None):
-        # TODO write train logic
+    def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
 
@@ -73,6 +82,9 @@ class FuzzyVolatilityModel:
                           f'Estimated parameters: {self.clusters_parameters_current}\n'
                           f'Membership degrees:\n{self.membership_degrees_current}')
 
+        self._clusters_parameters_hist.append(self.clusters_parameters_current)
+        self._membership_degrees_hist.append(self.membership_degrees_current)
+
         # running local models for each rule
         self.logger.debug('Starting to run local model for each rule')
 
@@ -85,19 +97,20 @@ class FuzzyVolatilityModel:
             # we only forecast for the next day, it is a common practice
             self.rules_outputs_current.append(rule_output)
 
-        rules_outputs_current = array(self.rules_outputs_current)
+        self.rules_outputs_current = array(self.rules_outputs_current)
 
         self.logger.debug(f'Local model runs for each rule are completed. rules_outputs_current: '
                           f'{self.rules_outputs_current}')
 
-        self._rules_outputs_hist = append(self._rules_outputs_hist, [rules_outputs_current], axis=0).copy()
+        # self._rules_outputs_hist = append(self._rules_outputs_hist, [self.rules_outputs_current], axis=0).copy()
+        self._rules_outputs_hist.append(self.rules_outputs_current)
 
         # aggregating rules outputs to a single output
         self.logger.debug('Starting to aggregate all rules outputs to a single one')
 
-        combined_output = combine_rules_outputs(rules_outputs_current, self.membership_degrees_current)
-
-        self.current_output = combined_output
+        self.current_output = combine_rules_outputs(self.rules_outputs_current, self.membership_degrees_current)
+        self.logger.debug(f'Rules outputs are combined; current_output: {self.current_output}')
+        self._hist_output.append(self.current_output)
 
     def push(self, observation):
         # TODO write push logic
