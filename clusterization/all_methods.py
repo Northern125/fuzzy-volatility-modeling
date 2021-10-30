@@ -1,4 +1,5 @@
 import logging
+from numpy import diag
 
 from .gaussian import calc_gaussian_membership_degrees
 
@@ -14,6 +15,8 @@ def cluster_data(x, method: str = 'gaussian', parameters: dict = None):
 
     logger = logging.getLogger('cluster_input')
 
+    n = x.shape[0]
+
     if method == 'gaussian':
         logger.debug('clustering method is gaussian')
 
@@ -21,7 +24,11 @@ def cluster_data(x, method: str = 'gaussian', parameters: dict = None):
             logger.debug('parameters is not None')
 
             centers = parameters['centers']
-            cov_matrices = parameters['cov_matrices']
+            variances = parameters['variances']
+
+            centers = [[center] * n for center in centers]
+            cov_matrices = [diag([variance] * n, k=0) for variance in variances]
+
             membership_degrees = calc_gaussian_membership_degrees(x, centers, cov_matrices)
 
             result = {'parameters': parameters, 'membership': membership_degrees}
