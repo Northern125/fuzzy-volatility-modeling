@@ -1,6 +1,6 @@
 import logging
 from pandas import Series, DataFrame
-from numpy import array, empty, append
+from numpy import array
 
 from clusterization import cluster_data
 from local_models import apply_local_model
@@ -15,8 +15,7 @@ class FuzzyVolatilityModel:
                  clusterization_method: str = 'gaussian',
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
-                 local_method_parameters: dict = None
-                 ):
+                 local_method_parameters: dict = None):
         self.logger = logging.getLogger(module_logger.name + '.FuzzyVolatilityModel')
         self.logger.info('Creating an instance of FuzzyVolatilityModel')
 
@@ -41,7 +40,7 @@ class FuzzyVolatilityModel:
         self.membership_degrees_current = None
 
         # rules outputs
-        self._rules_outputs_hist = []  # empty((0, self.clusterization_parameters['n_clusters']), dtype=float)
+        self._rules_outputs_hist = []
         self.rules_outputs_hist = DataFrame(dtype=float).copy()
         self.rules_outputs_current = None
 
@@ -49,18 +48,6 @@ class FuzzyVolatilityModel:
         self._hist_output = []
         self.hist_output = Series(dtype=float).copy()
         self.current_output = None
-
-        # if test_data is not None:
-        #     self.test_data = test_data.copy()
-        # else:
-        #     if n_test is not None:
-        #         self.test_data = self.train_data.iloc[-n_test:].copy()
-        #         self.train_data = self.train_data.iloc[:-n_test].copy()
-        #     else:
-        #         self.test_data = Series(dtype=float).copy()
-        #
-        # self.logger.debug(f'test_data: {test_data}\n'
-        #                   f'train_data: {train_data}')
 
     def fit(self, train_data: Series = None):
         if train_data is not None:
@@ -102,7 +89,6 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'Local model runs for each rule are completed. rules_outputs_current: '
                           f'{self.rules_outputs_current}')
 
-        # self._rules_outputs_hist = append(self._rules_outputs_hist, [self.rules_outputs_current], axis=0).copy()
         self._rules_outputs_hist.append(self.rules_outputs_current)
 
         # aggregating rules outputs to a single output
@@ -113,12 +99,10 @@ class FuzzyVolatilityModel:
         self._hist_output.append(self.current_output)
 
     def push(self, observation: float, observation_date):
-        # TODO write push logic
         self.train_data.loc[observation_date] = observation
         self.fit()
 
     def forecast(self, test_data: Series):
-        # TODO write forecast logic
         for date in test_data.index:
             observation = test_data.loc[date]
             self.push(observation, date)
