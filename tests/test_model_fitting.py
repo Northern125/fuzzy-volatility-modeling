@@ -41,6 +41,7 @@ class TestFit(unittest.TestCase):
                                    local_method=local_method,
                                    local_method_parameters=local_method_parameters)
         fvm.fit()
+        fvm.forecast()
         fvm_forecasted_variance = fvm.current_output
 
         # running garch
