@@ -13,6 +13,7 @@
       "cov_matrices": ""
     }
   },
+  "forecast_horizon": 1,
   "files_folders":
   {
     "source":  "files",
