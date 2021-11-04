@@ -1,5 +1,4 @@
 import logging
-import json
 
 from arch import arch_model
 from pandas import Series, DataFrame
@@ -101,11 +100,7 @@ class FuzzyVolatilityModel:
             self.garch_models.append(model)
             self.fitted_garch_models.append(fitted)
 
-        # self.rules_outputs_current = array(self.rules_outputs_current)
-
         self.logger.debug('Local model fittings for each rule are completed')
-
-        # self._rules_outputs_hist.append(self.rules_outputs_current)
 
     def _calc_local_models_forecasts(self, horizon=1):
         rules_outputs = []
@@ -132,12 +127,17 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'Rules outputs are combined; current_output: {self.current_output}')
         self._hist_output.append(self.current_output)
 
-    def push(self, observation: float, observation_date):
+    def _push(self, observation: float, observation_date):
         self.train_data.loc[observation_date] = observation
         self.fit()
 
     def feed_daily_data(self, test_data: Series):
+        if self.current_output is None:
+            # if there is no current forecast (AKA the model has just been created),
+            # then do forecast before running the main algorithm
+            self.forecast()
+
         for date in test_data.index:
             observation = test_data.loc[date]
-            self.push(observation, date)
+            self._push(observation, date)
             self.forecast()
