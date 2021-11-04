@@ -1,7 +1,7 @@
 import logging
 
 from arch import arch_model
-from pandas import Series, DataFrame
+from pandas import Series, DataFrame, concat
 
 from clusterization import cluster_data
 from rules_related import combine_rules_outputs
@@ -137,7 +137,28 @@ class FuzzyVolatilityModel:
             # then do forecast before running the main algorithm
             self.forecast()
 
+        # imitating live daily algorithm work
         for date in test_data.index:
             observation = test_data.loc[date]
             self._push(observation, date)
             self.forecast()
+
+        # adding dates
+        dates = test_data.index.copy()
+        n_test_dates = dates.shape[0]
+
+        slc = slice(-n_test_dates - 1, -1)
+
+        hist_output_new = Series(self._hist_output[slc], index=dates).copy()
+        self.hist_output = concat([self.hist_output, hist_output_new]).copy()
+
+        rules_outputs_hist_new = DataFrame.from_records(self._rules_outputs_hist[slc], index=dates).copy()
+        self.rules_outputs_hist = concat([self.rules_outputs_hist, rules_outputs_hist_new], axis='index').copy()
+
+        membership_degrees_hist_new = DataFrame.from_records(self._membership_degrees_hist[slc], index=dates).copy()
+        self.membership_degrees_hist = concat([self.membership_degrees_hist, membership_degrees_hist_new],
+                                              axis='index').copy()
+
+        clusters_paramters_hist_new = DataFrame.from_records(self._clusters_parameters_hist[slc], index=dates).copy()
+        self.clusters_parameters_hist = concat([self.clusters_parameters_hist, clusters_paramters_hist_new],
+                                               axis='index').copy()
