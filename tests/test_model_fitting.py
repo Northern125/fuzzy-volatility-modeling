@@ -64,7 +64,7 @@ class TestFit(unittest.TestCase):
         self.assertAlmostEqual(fvm_forecasted_variance, garch_forecasted_variance, places=round_to)
 
     def test_1_cluster_feeding(self):
-        n_test = random.randint(1, high=11)
+        n_test = random.randint(5, high=11)
         n_train = n - n_test
         train, test = data.iloc[:n_train].copy(), data.iloc[n_train:].copy()
 
