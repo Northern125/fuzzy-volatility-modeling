@@ -80,7 +80,8 @@ class FuzzyVolatilityModel:
         # fitting local models within each rule
         self.logger.debug('Starting to fit local model within each rule')
 
-        # self.rules_outputs_current = []
+        self.garch_models = []
+        self.fitted_garch_models = []
         for _ in range(n_clusters):
             # rule_output = apply_local_model(self.train_data,
             #                                 method=self.local_method,
@@ -104,7 +105,7 @@ class FuzzyVolatilityModel:
 
         self.logger.debug('Local model fittings for each rule are completed')
 
-        self._rules_outputs_hist.append(self.rules_outputs_current)
+        # self._rules_outputs_hist.append(self.rules_outputs_current)
 
     def _calc_local_models_forecasts(self, horizon=1):
         rules_outputs = []
@@ -116,8 +117,13 @@ class FuzzyVolatilityModel:
         return rules_outputs
 
     def forecast(self):
+        # calculating rules outputs
+        self.logger.debug('Starting to calculate rules outputs')
+
         rules_outputs = self._calc_local_models_forecasts(horizon=1)
         self.rules_outputs_current = [output.loc['h.1'] for output in rules_outputs]
+        self.logger.debug(f'Rules outputs calculated; rules_outputs_current: {self.rules_outputs_current}')
+        self._rules_outputs_hist.append(self.rules_outputs_current)
 
         # aggregating rules outputs to a single output
         self.logger.debug('Starting to aggregate all rules outputs to a single one')
@@ -134,3 +140,4 @@ class FuzzyVolatilityModel:
         for date in test_data.index:
             observation = test_data.loc[date]
             self.push(observation, date)
+            self.forecast()
