@@ -159,6 +159,6 @@ class FuzzyVolatilityModel:
         self.membership_degrees_hist = concat([self.membership_degrees_hist, membership_degrees_hist_new],
                                               axis='index').copy()
 
-        clusters_paramters_hist_new = DataFrame.from_records(self._clusters_parameters_hist[slc], index=dates).copy()
-        self.clusters_parameters_hist = concat([self.clusters_parameters_hist, clusters_paramters_hist_new],
+        clusters_parameters_hist_new = DataFrame.from_records(self._clusters_parameters_hist[slc], index=dates).copy()
+        self.clusters_parameters_hist = concat([self.clusters_parameters_hist, clusters_parameters_hist_new],
                                                axis='index').copy()
