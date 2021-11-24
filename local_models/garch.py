@@ -1,5 +1,6 @@
 from rules_related import combine_rules_outputs
 from numpy import array
+from pandas import IndexSlice as idx
 import logging
 
 
@@ -57,5 +58,7 @@ def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
         h_slc = slice(i - p, i)
         h_t = _calc_ht(alpha_0, alpha, beta, y_squared[y_slc], h[h_slc])
         h.append(h_t)
+
+    h = array(h)
 
     return h
