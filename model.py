@@ -5,6 +5,7 @@ from pandas import Series, DataFrame, concat
 
 from clusterization import cluster_data
 from rules_related import combine_rules_outputs
+from local_models import calc_fuzzy_ht
 
 module_logger = logging.getLogger('model')
 
@@ -50,12 +51,22 @@ class FuzzyVolatilityModel:
         self.current_output = None
 
         # garch objects
-        self.garch_models = []
-        self.fitted_garch_models = []
+        # self.garch_models = []
+        # self.fitted_garch_models = []
+
+        # consequent parameters
+        self.alpha = None
+        self.beta = None
+        self._alpha_hist = None
+        self._beta_hist = None
+        self.alpha_hist = None
+        self.beta_hist = None
 
     def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
+
+        n = self.train_data.shape[0]
 
         # clusterization
         self.logger.debug('Starting clusterization')
@@ -79,21 +90,27 @@ class FuzzyVolatilityModel:
         # fitting local models within each rule
         self.logger.debug('Starting to fit local model within each rule')
 
+        p = self.local_method_parameters['p']
+        q = self.local_method_parameters['q']
+        mean = self.local_method_parameters['mean']
+        dist = self.local_method_parameters['dist']
+
+        def calc_residuals(parameters):
+            starting_index = max(p, q)
+
+            y = []
+            h = []
+
+            alpha_0 = parameters[:n_clusters]
+            alpha = parameters[n_clusters:(n_clusters * q)]
+            beta = parameters[(n_clusters * q):]
+
+            for t in range(starting_index, n):
+                y_t = calc_fuzzy_ht(alpha_0, alpha, beta, self.train_data, h, self.membership_degrees_current)
+
         self.garch_models = []
         self.fitted_garch_models = []
         for _ in range(n_clusters):
-            # rule_output = apply_local_model(self.train_data,
-            #                                 method=self.local_method,
-            #                                 parameters=self.local_method_parameters,
-            #                                 forecast_horizon=1)['forecast'][0]  # yes, hardcode:
-            # # we only forecast for the next day, it is a common practice
-            # self.rules_outputs_current.append(rule_output)
-
-            p = self.local_method_parameters['p']
-            q = self.local_method_parameters['q']
-            mean = self.local_method_parameters['mean']
-            dist = self.local_method_parameters['dist']
-
             model = arch_model(self.train_data, mean=mean, vol='GARCH', p=p, q=q, dist=dist)
             fitted = model.fit()
 
