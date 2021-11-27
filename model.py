@@ -2,10 +2,11 @@ import logging
 
 from arch import arch_model
 from pandas import Series, DataFrame, concat
+from numpy import array
 
 from clusterization import cluster_data
 from rules_related import combine_rules_outputs
-from local_models import calc_fuzzy_ht
+from local_models import calc_cond_var
 
 module_logger = logging.getLogger('model')
 
@@ -94,19 +95,22 @@ class FuzzyVolatilityModel:
         q = self.local_method_parameters['q']
         mean = self.local_method_parameters['mean']
         dist = self.local_method_parameters['dist']
+        first_h = array(self.local_method_parameters['first_h'])
+
+        starting_index = max(p, q)
 
         def calc_residuals(parameters):
-            starting_index = max(p, q)
-
-            y = []
-            h = []
+            alpha_arr_right_end = n_clusters + (n_clusters * q)
 
             alpha_0 = parameters[:n_clusters]
-            alpha = parameters[n_clusters:(n_clusters * q)]
-            beta = parameters[(n_clusters * q):]
+            alpha = parameters[n_clusters:alpha_arr_right_end].reshape(q, n_clusters).T
+            beta = parameters[alpha_arr_right_end:].reshape(p, n_clusters).T
 
-            for t in range(starting_index, n):
-                y_t = calc_fuzzy_ht(alpha_0, alpha, beta, self.train_data, h, self.membership_degrees_current)
+            h = calc_cond_var(alpha_0, alpha, beta, self.train_data ** 2, first_h,
+                              fuzzy=True, weights=self.membership_degrees_current)
+
+            residuals = self.train_data[starting_index:] - h
+            return residuals
 
         self.garch_models = []
         self.fitted_garch_models = []
