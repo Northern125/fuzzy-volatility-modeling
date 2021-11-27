@@ -10,11 +10,14 @@ def calc_ht(alpha_0, alpha, beta, y_squared, h):
 
 
 def calc_fuzzy_ht(alpha_0, alpha, beta, y_squared, h, weights):
+    logger = logging.getLogger('calc_fuzzy_ht')
+
     outputs = []
     n_clusters = weights.shape[0]
 
     for j in range(n_clusters):
-        local_output = calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h[:, j])
+        logger.debug(f'Iteration #{j}: ')
+        local_output = calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h)
         outputs.append(local_output)
 
     outputs = array(outputs)
