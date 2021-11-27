@@ -43,6 +43,7 @@ def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
     p = len(beta)
 
     starting_index = max(p, q)
+    logger.debug(f'starting_index = {starting_index}')
 
     if len(first_h) < starting_index:
         raise Exception(f'Not enough first elements of h are given. p = {p}, q = {q}, max(p, q) = {starting_index}. '
@@ -52,12 +53,15 @@ def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
     h = list(first_h)
 
     y_len = len(y_squared)
+    logger.debug(f'y_len = {y_len}')
 
-    for i in range(starting_index, y_len):
+    for i in range(starting_index, y_len + 1):
         y_slc = slice(i - q, i)
         h_slc = slice(i - p, i)
         h_t = _calc_ht(alpha_0, alpha, beta, y_squared[y_slc], h[h_slc])
         h.append(h_t)
+        logger.debug(f'New iteration; i = {i}: h_t = {h_t}, y_slc = {y_slc}, h_slc = {h_slc}, '
+                     f'y_squared[y_slc] = {y_squared[y_slc]}, h[h_slc] = {h[h_slc]}')
 
     h = array(h)
 
