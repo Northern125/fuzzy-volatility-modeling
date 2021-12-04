@@ -9,7 +9,10 @@ def combine_rules_outputs(outputs, weights):
     weights = array(weights).copy()
 
     weights_sum = weights.sum()
-    logger.info(f'weights_sum: {weights_sum}')
+    logger.info('weights_sum: ' + str(weights_sum))
+
+    if weights_sum == 0:
+        raise ZeroDivisionError('weights_sum should not be equal to 0')
 
     result = (weights * outputs).sum() / weights_sum
 
