@@ -102,6 +102,7 @@ class FuzzyVolatilityModel:
         dist = self.local_method_parameters['dist']
         first_h = array(self.local_method_parameters['first_h'])
         bounds = self.local_method_parameters['bounds']
+        parameters_ini = self.local_method_parameters['parameters_ini']
 
         starting_index = max(p, q)
         self.logger.debug(f'starting_index = {starting_index}')
@@ -117,9 +118,7 @@ class FuzzyVolatilityModel:
             self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
             return residuals
 
-        alpha_0_ini = array([0] * n_clusters)
-        alpha_ini = array([[1] * n_clusters] * q)
-        beta_ini = array([[1] * n_clusters] * p)
+        alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
         ls_result = least_squares(calc_residuals, parameters_0, bounds=bounds)
 
