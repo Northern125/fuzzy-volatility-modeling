@@ -3,10 +3,12 @@ import logging
 from arch import arch_model
 from pandas import Series, DataFrame, concat
 from numpy import array
+from scipy.optimize import least_squares
 
 from clusterization import cluster_data
 from rules_related import combine_rules_outputs
 from local_models import calc_cond_var
+from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
 module_logger = logging.getLogger('model')
 
@@ -56,10 +58,13 @@ class FuzzyVolatilityModel:
         # self.fitted_garch_models = []
 
         # consequent parameters
+        self.alpha_0 = None
         self.alpha = None
         self.beta = None
+        self._alpha_0_hist = None
         self._alpha_hist = None
         self._beta_hist = None
+        self.alpha_0_hist = None
         self.alpha_hist = None
         self.beta_hist = None
 
@@ -96,32 +101,34 @@ class FuzzyVolatilityModel:
         mean = self.local_method_parameters['mean']
         dist = self.local_method_parameters['dist']
         first_h = array(self.local_method_parameters['first_h'])
+        bounds = self.local_method_parameters['bounds']
 
         starting_index = max(p, q)
+        self.logger.debug(f'starting_index = {starting_index}')
 
-        def calc_residuals(parameters):
-            alpha_arr_right_end = n_clusters + (n_clusters * q)
-
-            alpha_0 = parameters[:n_clusters]
-            alpha = parameters[n_clusters:alpha_arr_right_end].reshape(q, n_clusters).T
-            beta = parameters[alpha_arr_right_end:].reshape(p, n_clusters).T
+        def calc_residuals(_parameters):
+            alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=p, q=q, n_clusters=n_clusters)
 
             h = calc_cond_var(alpha_0, alpha, beta, self.train_data ** 2, first_h,
                               fuzzy=True, weights=self.membership_degrees_current)
 
-            residuals = self.train_data[starting_index:] - h
+            residuals = self.train_data[starting_index:] - h[starting_index:-1]
+            self.logger.debug(f'residuals =\n{residuals}')
+            self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
             return residuals
 
-        self.garch_models = []
-        self.fitted_garch_models = []
-        for _ in range(n_clusters):
-            model = arch_model(self.train_data, mean=mean, vol='GARCH', p=p, q=q, dist=dist)
-            fitted = model.fit()
+        alpha_0_ini = array([0] * n_clusters)
+        alpha_ini = array([[1] * n_clusters] * q)
+        beta_ini = array([[1] * n_clusters] * p)
+        parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
+        ls_result = least_squares(calc_residuals, parameters_0, bounds=bounds)
 
-            self.garch_models.append(model)
-            self.fitted_garch_models.append(fitted)
+        parameters = ls_result.x
+        self.logger.debug(f'parameters = {parameters}')
 
-        self.logger.debug('Local model fittings for each rule are completed')
+        self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=n_clusters)
+
+        self.logger.debug('Fitting is completed')
 
     def _calc_local_models_forecasts(self, horizon=1):
         rules_outputs = []
