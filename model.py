@@ -61,12 +61,8 @@ class FuzzyVolatilityModel:
         self.alpha_0 = None
         self.alpha = None
         self.beta = None
-        self._alpha_0_hist = None
-        self._alpha_hist = None
-        self._beta_hist = None
-        self.alpha_0_hist = None
-        self.alpha_hist = None
-        self.beta_hist = None
+        self._parameters_hist = []
+        # self.parameters_hist = DataFrame(dtype=float).copy()
 
     def fit(self, train_data: Series = None):
         if train_data is not None:
@@ -113,9 +109,10 @@ class FuzzyVolatilityModel:
             h = calc_cond_var(alpha_0, alpha, beta, self.train_data ** 2, first_h,
                               fuzzy=True, weights=self.membership_degrees_current)
 
-            residuals = self.train_data[starting_index:] - h[starting_index:-1]
+            residuals = self.train_data[starting_index:] ** 2 - h[starting_index:-1]
             self.logger.debug(f'residuals =\n{residuals}')
             self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
+
             return residuals
 
         alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
@@ -126,6 +123,7 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'parameters = {parameters}')
 
         self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=n_clusters)
+        self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
 
         self.logger.debug('Fitting is completed')
 
