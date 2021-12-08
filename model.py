@@ -64,6 +64,9 @@ class FuzzyVolatilityModel:
         self._parameters_hist = []
         # self.parameters_hist = DataFrame(dtype=float).copy()
 
+        # GARCH variables
+        self.h = None
+
     def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
@@ -94,8 +97,6 @@ class FuzzyVolatilityModel:
 
         p = self.local_method_parameters['p']
         q = self.local_method_parameters['q']
-        mean = self.local_method_parameters['mean']
-        dist = self.local_method_parameters['dist']
         first_h = array(self.local_method_parameters['first_h'])
         bounds = self.local_method_parameters['bounds']
         parameters_ini = self.local_method_parameters['parameters_ini']
@@ -117,39 +118,22 @@ class FuzzyVolatilityModel:
 
         alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
+        self.logger.debug('Starting least squares estimation of parameters')
         ls_result = least_squares(calc_residuals, parameters_0, bounds=bounds)
 
         parameters = ls_result.x
-        self.logger.debug(f'parameters = {parameters}')
+        self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}')
 
         self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
 
         self.logger.debug('Fitting is completed')
 
-    def _calc_local_models_forecasts(self, horizon=1):
-        rules_outputs = []
-
-        for model in self.fitted_garch_models:
-            rule_output = model.forecast(reindex=False, horizon=horizon).variance.iloc[0]
-            rules_outputs.append(rule_output)
-
-        return rules_outputs
-
     def forecast(self):
-        # calculating rules outputs
-        self.logger.debug('Starting to calculate rules outputs')
-
-        rules_outputs = self._calc_local_models_forecasts(horizon=1)
-        self.rules_outputs_current = [output.loc['h.1'] for output in rules_outputs]
-        self.logger.debug(f'Rules outputs calculated; rules_outputs_current: {self.rules_outputs_current}')
-        self._rules_outputs_hist.append(self.rules_outputs_current)
-
-        # aggregating rules outputs to a single output
-        self.logger.debug('Starting to aggregate all rules outputs to a single one')
-
-        self.current_output = combine_rules_outputs(self.rules_outputs_current, self.membership_degrees_current)
-        self.logger.debug(f'Rules outputs are combined; current_output: {self.current_output}')
+        first_h = array(self.local_method_parameters['first_h'])
+        self.h = calc_cond_var(self.alpha_0, self.alpha, self.beta, self.train_data ** 2, first_h,
+                               fuzzy=True, weights=self.membership_degrees_current)
+        self.current_output = self.h[-1]
         self._hist_output.append(self.current_output)
 
     def _push(self, observation: float, observation_date):
