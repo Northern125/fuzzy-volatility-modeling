@@ -65,6 +65,30 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         tolerance = 1e-5
         self.assertAlmostEqual(h_main_fun[1], h_aux_fun, delta=tolerance)
 
+    def test_vanilla_garch_1_1_up_to_t_5(self):
+        logger = logging.getLogger('test_vanilla_garch_1_1_up_to_t_5')
+
+        # setting parameters
+        alpha_0 = .4
+        alpha = array([.2])
+        beta = array([.3])
+
+        # setting y_t & h_0
+        y_squared = array([.095, .797, .234, 1.568, .681])
+        first_h = array([1])
+
+        # calculating h
+        h = calc_cond_var(alpha_0, alpha, beta, y_squared=y_squared, first_h=first_h,
+                          fuzzy=False)
+        self.assertEqual(len(h), 6)
+
+        should_be = list(first_h) + [.719, .7751, .67933, .917399, .8114197]
+
+        diff = abs(h - list(should_be))
+
+        tolerance = 1e-5
+        self.assertTrue((diff < tolerance).all())
+
 
 if __name__ == '__main__':
     unittest.main()
