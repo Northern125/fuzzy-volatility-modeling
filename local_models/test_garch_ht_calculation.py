@@ -5,8 +5,6 @@ import logging
 
 from . import calc_cond_var, calc_ht, calc_fuzzy_ht
 
-logging.basicConfig(level=logging.DEBUG)
-
 
 class TestCustomGARCHCondVarCalc(unittest.TestCase):
     def test_vanilla_garch_1_1(self):
@@ -65,9 +63,7 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         tolerance = 1e-5
         self.assertAlmostEqual(h_main_fun[1], h_aux_fun, delta=tolerance)
 
-    def test_vanilla_garch_1_1_up_to_t_5(self):
-        logger = logging.getLogger('test_vanilla_garch_1_1_up_to_t_5')
-
+    def test_garch_1_1_up_to_t_5(self):
         # setting parameters
         alpha_0 = .4
         alpha = array([.2])
@@ -77,14 +73,21 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         y_squared = array([.095, .797, .234, 1.568, .681])
         first_h = array([1])
 
-        # calculating h
-        h = calc_cond_var(alpha_0, alpha, beta, y_squared=y_squared, first_h=first_h,
-                          fuzzy=False)
-        self.assertEqual(len(h), 6)
+        # calculating h_vanilla
+        h_vanilla = calc_cond_var(alpha_0, alpha, beta,
+                                  y_squared=y_squared, first_h=first_h,
+                                  fuzzy=False)
+        h_fuzzy = calc_cond_var(array([alpha_0]), array([alpha]).T, array([beta]),
+                                y_squared=y_squared, first_h=first_h,
+                                fuzzy=True, weights=array([.534]))
+        self.assertEqual(len(h_vanilla), 6)
+        self.assertEqual(len(h_fuzzy), 6)
+
+        self.assertTrue((h_vanilla == h_fuzzy).all())
 
         should_be = list(first_h) + [.719, .7751, .67933, .917399, .8114197]
 
-        diff = abs(h - list(should_be))
+        diff = abs(h_vanilla - list(should_be))
 
         tolerance = 1e-5
         self.assertTrue((diff < tolerance).all())
