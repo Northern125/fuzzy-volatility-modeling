@@ -1,12 +1,10 @@
 import logging
 
-from arch import arch_model
 from pandas import Series, DataFrame, concat
 from numpy import array
 from scipy.optimize import least_squares
 
 from clusterization import cluster_data
-from rules_related import combine_rules_outputs
 from local_models import calc_cond_var
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
@@ -62,7 +60,6 @@ class FuzzyVolatilityModel:
         self.alpha = None
         self.beta = None
         self._parameters_hist = []
-        # self.parameters_hist = DataFrame(dtype=float).copy()
 
         # GARCH variables
         self.h = None
@@ -70,8 +67,6 @@ class FuzzyVolatilityModel:
     def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
-
-        n = self.train_data.shape[0]
 
         # clusterization
         self.logger.debug('Starting clusterization')
