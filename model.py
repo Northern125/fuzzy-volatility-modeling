@@ -1,4 +1,5 @@
 import logging
+from typing import Union
 
 from pandas import Series, DataFrame, concat
 from numpy import array
@@ -17,8 +18,9 @@ class FuzzyVolatilityModel:
                  clusterization_method: str = 'gaussian',
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
-                 local_method_parameters: dict = None):
-        self.logger = logging.getLogger(module_logger.name + '.FuzzyVolatilityModel')
+                 local_method_parameters: dict = None,
+                 data_to_cluster: Union[str, Series] = 'train'):
+        self.logger = logging.getLogger(module_logger.name + '.' + __name__)
         self.logger.info('Creating an instance of FuzzyVolatilityModel')
 
         self.clusterization_method = clusterization_method
@@ -35,6 +37,10 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
+        if type(data_to_cluster) is str and data_to_cluster == 'train':
+            self.data_to_cluster = data_to_cluster
+        else:
+            self.data_to_cluster = data_to_cluster.copy()
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -71,7 +77,11 @@ class FuzzyVolatilityModel:
         # clusterization
         self.logger.debug('Starting clusterization')
 
-        clusterization_result = cluster_data(self.train_data,
+        if type(self.data_to_cluster) is str and self.data_to_cluster == 'train':
+            data_to_cluster = self.train_data
+        else:
+            data_to_cluster = self.data_to_cluster
+        clusterization_result = cluster_data(data_to_cluster,
                                              method=self.clusterization_method,
                                              parameters=self.clusterization_parameters)
 
@@ -131,20 +141,28 @@ class FuzzyVolatilityModel:
         self.current_output = self.h[-1]
         self._hist_output.append(self.current_output)
 
-    def _push(self, observation: float, observation_date):
+    def _push(self, observation: float, observation_date, data_to_cluster_point):
         self.train_data.loc[observation_date] = observation
+        if type(self.data_to_cluster) is not str:
+            self.data_to_cluster.loc[observation_date] = data_to_cluster_point
+        elif self.data_to_cluster != 'train':
+            raise Exception("""`data_to_cluster` should be either a string 'train' or not a string""")
         self.fit()
 
-    def feed_daily_data(self, test_data: Series):
+    def feed_daily_data(self, test_data: Series, data_to_cluster=None):
         if self.current_output is None:
             # if there is no current forecast (AKA the model has just been created),
             # then do forecast before running the main algorithm
             self.forecast()
 
         # imitating live daily algorithm work
+        if type(self.data_to_cluster) is str and self.data_to_cluster == 'train':
+            data_to_cluster = test_data
+
         for date in test_data.index:
             observation = test_data.loc[date]
-            self._push(observation, date)
+            data_to_cluster_point = data_to_cluster.loc[date]
+            self._push(observation, date, data_to_cluster_point)
             self.forecast()
 
         # adding dates
