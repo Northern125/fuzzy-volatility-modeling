@@ -155,10 +155,12 @@ class FuzzyVolatilityModel:
             # then do forecast before running the main algorithm
             self.forecast()
 
-        # imitating live daily algorithm work
         if type(self.data_to_cluster) is str and self.data_to_cluster == 'train':
             data_to_cluster = test_data
+        elif data_to_cluster is None:
+            raise Exception("""self.data_to_cluster is not 'train', but given data_to_cluster is None""")
 
+        # imitating live daily algorithm work
         for date in test_data.index:
             observation = test_data.loc[date]
             data_to_cluster_point = data_to_cluster.loc[date]
