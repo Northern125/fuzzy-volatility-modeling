@@ -17,6 +17,7 @@
   "files_folders":
   {
     "source":  "files",
-    "processed": "processed_files"
+    "processed": "processed_files",
+    "research_results": "research_results"
   }
 }
