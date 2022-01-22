@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+import logging
 
 from model import FuzzyVolatilityModel
 
@@ -11,6 +12,8 @@ def fit_antecedent_params(train, test,
                           clusterization_method='gaussian',
                           local_method='garch',
                           data_to_cluster_train='train', data_to_cluster_test=None):
+    logger = logging.getLogger('fit_antecedent_params')
+
     consequent_metaparams = consequent_metaparams
 
     # parameters_ini (for LS)
@@ -27,7 +30,10 @@ def fit_antecedent_params(train, test,
     mses = []
     mapes = []
 
+    i = 0
     for antecedent_params in antecedent_params_set:
+        logger.info(f'Starting iteration #{i}')
+
         n_clusters = antecedent_params['n_clusters']
 
         # parameters_ini (for LS)
@@ -66,5 +72,8 @@ def fit_antecedent_params(train, test,
         mape = mean_absolute_percentage_error(fvm.hist_output, test ** 2)
         mses.append(mse)
         mapes.append(mape)
+
+        logger.info(f'Iteration #{i} ended')
+        i += 1
 
     return {'fvms': fvms, 'mses': mses, 'mapes': mapes}
