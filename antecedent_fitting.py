@@ -17,9 +17,9 @@ def fit_antecedent_params(train, test,
     consequent_metaparams = consequent_metaparams
 
     # parameters_ini (for LS)
-    alpha_0_ini = consequent_params_ini['alpha_0']
-    alpha_ini = consequent_params_ini['alpha']
-    beta_ini = consequent_params_ini['beta']
+    alpha_0_ini_1cl = consequent_params_ini['alpha_0']
+    alpha_ini_1cl = consequent_params_ini['alpha']
+    beta_ini_1cl = consequent_params_ini['beta']
 
     # p & q
     p = consequent_metaparams['p']
@@ -37,9 +37,9 @@ def fit_antecedent_params(train, test,
         n_clusters = antecedent_params['n_clusters']
 
         # parameters_ini (for LS)
-        alpha_0_ini = np.array([alpha_0_ini] * n_clusters)
-        alpha_ini = np.array([alpha_ini] * n_clusters).T
-        beta_ini = np.array([beta_ini] * n_clusters).T
+        alpha_0_ini = np.array([alpha_0_ini_1cl] * n_clusters)
+        alpha_ini = np.array([alpha_ini_1cl] * n_clusters).T
+        beta_ini = np.array([beta_ini_1cl] * n_clusters).T
 
         parameters_ini = {'alpha_0': alpha_0_ini, 'alpha': alpha_ini, 'beta': beta_ini}
 
