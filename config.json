@@ -18,6 +18,7 @@
   {
     "source":  "files",
     "processed": "processed_files",
-    "research_results": "research_results"
+    "research_results": "research_results",
+    "antecedent_params_sets": "antecedent_params_sets"
   }
 }
