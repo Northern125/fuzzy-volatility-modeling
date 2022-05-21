@@ -2,6 +2,7 @@
 testing_garch.ipynb
 research_results/
 files/
+figures/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
