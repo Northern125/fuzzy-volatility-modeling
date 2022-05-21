@@ -3,6 +3,8 @@ testing_garch.ipynb
 research_results/
 files/
 figures/
+*summary_m.xlsx
+current_antecedent_fitting_metadata.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
