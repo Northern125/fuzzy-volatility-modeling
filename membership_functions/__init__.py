@@ -1,0 +1,1 @@
+from .trapezoidal import calc_trapezoidal_membership_degrees
