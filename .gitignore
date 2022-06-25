@@ -5,6 +5,7 @@ files/
 figures/
 *summary_m.xlsx
 current_antecedent_fitting_metadata.pkl
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
