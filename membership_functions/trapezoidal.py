@@ -8,26 +8,27 @@ def calc_trapezoidal_membership_degrees(x: Union[list, array],
                                         c: Union[list, array],
                                         d: Union[list, array]) -> array:
     """
-    Calculate membership degrees of `x` to trapezoidal clusters given its parameters
+    Calculate membership degrees of `x` to trapezoidal clusters given its parameters; conjunction of scalar degrees
+    performed by multiplication
     :param x: 1D array-like, data to calculate membership degree for
     :param a: 1D array-like, parameter `a` for each cluster
     :param b: 1D array-like, parameter `b` for each cluster
     :param c: 1D array-like, parameter `c` for each cluster
     :param d: 1D array-like, parameter `d` for each cluster
-    :return: 2D `numpy.array`, membership degrees for each cluster (each row corresponds to result of a single cluster)
+    :return: 1D `numpy.array`, membership degrees for each cluster
     """
-    result = [calc_trapezoidal_membership_degrees_single_cluster(x, _a, _b, _c, _d)
+    result = [_calc_trapezoidal_membership_degrees_array(x, _a, _b, _c, _d).prod()
               for _a, _b, _c, _d in zip(a, b, c, d)]
     result = array(result)
 
     return result
 
 
-def calc_trapezoidal_membership_degrees_single_cluster(x: Union[list, array],
-                                                       a: float,
-                                                       b: float,
-                                                       c: float,
-                                                       d: float) -> array:
+def _calc_trapezoidal_membership_degrees_array(x: Union[list, array],
+                                               a: float,
+                                               b: float,
+                                               c: float,
+                                               d: float) -> array:
     """
     Calculate membership degrees of `x` to a trapezoidal cluster given its parameters
     :param x: 1D array-like, data to calculate membership degree for
