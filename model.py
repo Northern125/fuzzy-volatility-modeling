@@ -184,6 +184,7 @@ class FuzzyVolatilityModel:
         rules_outputs_hist_new = DataFrame.from_records(self._rules_outputs_hist[slc], index=dates).copy()
         self.rules_outputs_hist = concat([self.rules_outputs_hist, rules_outputs_hist_new], axis='index').copy()
 
+        slc = slice(-n_test_dates, None)
         membership_degrees_hist_new = DataFrame.from_records(self._membership_degrees_hist[slc], index=dates).copy()
         self.membership_degrees_hist = concat([self.membership_degrees_hist, membership_degrees_hist_new],
                                               axis='index').copy()
