@@ -19,7 +19,8 @@ class FuzzyVolatilityModel:
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
                  local_method_parameters: dict = None,
-                 data_to_cluster: Union[str, Series] = 'train'):
+                 data_to_cluster: Union[str, Series] = 'train',
+                 n_last_points_to_use_for_clustering: int = None):
         self.logger = logging.getLogger(module_logger.name + '.' + __name__)
         self.logger.info('Creating an instance of FuzzyVolatilityModel')
 
@@ -37,10 +38,12 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
-        if type(data_to_cluster) is str and data_to_cluster == 'train':
-            self.data_to_cluster = data_to_cluster
+        if type(data_to_cluster) is str and data_to_cluster == 'train' \
+                or data_to_cluster is None:
+            self.data_to_cluster = self.train_data.copy()
         else:
             self.data_to_cluster = data_to_cluster.copy()
+        self.n_last_points_to_use_for_clustering = n_last_points_to_use_for_clustering
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -83,7 +86,9 @@ class FuzzyVolatilityModel:
             data_to_cluster = self.data_to_cluster
         clusterization_result = cluster_data(data_to_cluster,
                                              method=self.clusterization_method,
-                                             parameters=self.clusterization_parameters)
+                                             parameters=self.clusterization_parameters,
+                                             n_last_points_to_use_for_clustering=
+                                             self.n_last_points_to_use_for_clustering)
 
         self.clusters_parameters_current = clusterization_result['parameters']
         n_clusters = self.clusters_parameters_current['n_clusters']
@@ -123,7 +128,7 @@ class FuzzyVolatilityModel:
 
         alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
-        self.logger.debug('Starting least squares estimation of parameters')
+        self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
         ls_result = least_squares(calc_residuals, parameters_0, bounds=bounds)
 
         parameters = ls_result.x
@@ -179,6 +184,7 @@ class FuzzyVolatilityModel:
         rules_outputs_hist_new = DataFrame.from_records(self._rules_outputs_hist[slc], index=dates).copy()
         self.rules_outputs_hist = concat([self.rules_outputs_hist, rules_outputs_hist_new], axis='index').copy()
 
+        slc = slice(-n_test_dates, None)
         membership_degrees_hist_new = DataFrame.from_records(self._membership_degrees_hist[slc], index=dates).copy()
         self.membership_degrees_hist = concat([self.membership_degrees_hist, membership_degrees_hist_new],
                                               axis='index').copy()
