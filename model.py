@@ -9,7 +9,7 @@ from clusterization import cluster_data
 from local_models import calc_cond_var
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
-module_logger = logging.getLogger('model')
+module_logger = logging.getLogger(__name__)
 
 
 class FuzzyVolatilityModel:
@@ -21,7 +21,7 @@ class FuzzyVolatilityModel:
                  local_method_parameters: dict = None,
                  data_to_cluster: Union[str, Series] = 'train',
                  n_last_points_to_use_for_clustering: int = None):
-        self.logger = logging.getLogger(module_logger.name + '.' + __name__)
+        self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info('Creating an instance of FuzzyVolatilityModel')
 
         self.clusterization_method = clusterization_method

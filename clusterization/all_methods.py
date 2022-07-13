@@ -20,7 +20,7 @@ def cluster_data(x: Union[list, array, Series], method: str = 'gaussian',
     of `x` to clusters}
     """
 
-    logger = logging.getLogger('cluster_input')
+    logger = logging.getLogger('cluster_data')
 
     n = x.shape[0]
 
