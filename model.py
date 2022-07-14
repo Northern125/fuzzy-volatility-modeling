@@ -85,7 +85,7 @@ class FuzzyVolatilityModel:
         else:
             data_to_cluster = self.data_to_cluster
         clusterization_result = cluster_data(data_to_cluster,
-                                             method=self.clusterization_method,
+                                             methods=self.clusterization_method,
                                              parameters=self.clusterization_parameters,
                                              n_last_points_to_use_for_clustering=
                                              self.n_last_points_to_use_for_clustering)
