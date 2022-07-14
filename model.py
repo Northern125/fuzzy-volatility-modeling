@@ -20,7 +20,8 @@ class FuzzyVolatilityModel:
                  local_method: str = 'garch',
                  local_method_parameters: dict = None,
                  data_to_cluster: Union[str, Series] = 'train',
-                 n_last_points_to_use_for_clustering: int = None):
+                 n_last_points_to_use_for_clustering: int = None,
+                 cluster_sets_conjunction: Union['str', callable] = 'prod'):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info('Creating an instance of FuzzyVolatilityModel')
 
@@ -44,6 +45,7 @@ class FuzzyVolatilityModel:
         else:
             self.data_to_cluster = data_to_cluster.copy()
         self.n_last_points_to_use_for_clustering = n_last_points_to_use_for_clustering
+        self.cluster_sets_conjunction = cluster_sets_conjunction
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -88,7 +90,8 @@ class FuzzyVolatilityModel:
                                              methods=self.clusterization_method,
                                              parameters=self.clusterization_parameters,
                                              n_last_points_to_use_for_clustering=
-                                             self.n_last_points_to_use_for_clustering)
+                                             self.n_last_points_to_use_for_clustering,
+                                             conjunction=self.cluster_sets_conjunction)
 
         self.clusters_parameters_current = clusterization_result['parameters']
         n_clusters = self.clusters_parameters_current['n_clusters']
