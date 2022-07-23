@@ -1,18 +1,19 @@
 import logging
 from typing import Union
 from numpy import diag, array
-from pandas import Series
+from pandas import Series, DataFrame
 from itertools import product
 
 from .gaussian import calc_gaussian_membership_degrees
 from membership_functions import calc_trapezoidal_membership_degrees
 
 
-def cluster_data(x: list,
+def cluster_data(x: Union[list, DataFrame],
                  methods: list,
                  parameters: list = None,
                  n_last_points_to_use_for_clustering: list = None,
-                 conjunction: Union[str, callable] = 'prod') -> dict:
+                 conjunction: Union[str, callable] = 'prod',
+                 n_sets: int = None) -> dict:
     """
     Cluster data given different cluster sets, combine them via Cartesian product and then perform conjunction
     (conjunction method is passed to `conjunction`). For example, if 2 cluster sets are given, first of size 2
@@ -25,36 +26,51 @@ def cluster_data(x: list,
     for each i-th cluster set
     :param conjunction: `str` in ('prod') or `callable`, conjunction method for combining membership degrees from
     different sets. Default 'prod' -- product
+    :param n_sets: int, optional, the number of cluster sets. If None, then inferred from `x` shape
     :return: `dict` {'parameters': estimated parameters of clusters, 'membership': 1D array of membership degrees
     of all `x`'s to resulting clusters}
     """
     logger = logging.getLogger('cluster_data')
 
+    x = x.copy()
+
     # workaround for backward compatibility (if given variables are 1D)
     if ((type(x) is array or type(x) is Series) and len(x.shape) == 1) or \
-            (type(x) is list and array(x).dtype != object and len(array(x).shape) == 1):
+            (type(x) is list and array(x).dtype != object and len(array(x).shape) == 1) or \
+            (type(x) is DataFrame and x.shape[1] == 1) or \
+            n_sets == 1:
         logger.debug('`x` is a 1D array, putting it and other variables into lists')
-        x = [x]
+        x = [x].copy()
         methods = [methods]
         if parameters is not None:
             parameters = [parameters]
         if n_last_points_to_use_for_clustering is not None:
             n_last_points_to_use_for_clustering = [n_last_points_to_use_for_clustering]
 
+    # inferring `n_sets` if not given and checking length of `x` otherwise
+    _n_sets_inferred = len(x) if type(x) is not DataFrame else x.shape[1]
+    if n_sets is None:
+        n_sets = _n_sets_inferred
+        logger.info(f'Inferred # of sets of clusters is {n_sets}')
+    elif _n_sets_inferred != n_sets:
+        raise ValueError(f'Inferred from `x` # of sets not equal to `n_sets`. '
+                         f'Got inferred # of sets = {_n_sets_inferred}, `n_sets = {n_sets}`')
+
     # checking lengths
-    if len(x) != len(methods):
+    if n_sets != len(methods):
         raise ValueError(f'Lengths of `x` and `methods` should coincide. Got `len(x) = {len(x)}`, '
                          f'`len(methods) = {len(methods)}`')
-    if parameters is not None and len(x) != len(parameters):
+    if parameters is not None and n_sets != len(parameters):
         raise ValueError(f'Lengths of `x` and `parameters` should coincide. Got `len(x) = {len(x)}`, '
                          f'`len(parameters) = {len(parameters)}`')
-    if n_last_points_to_use_for_clustering is not None and len(x) != len(n_last_points_to_use_for_clustering):
+    if n_last_points_to_use_for_clustering is not None and n_sets != len(n_last_points_to_use_for_clustering):
         raise ValueError(f'Lengths of `x` and `parameters` should coincide. Got `len(x) = {len(x)}`, '
                          f'`len(n_last_points_to_use_for_clustering) = {len(n_last_points_to_use_for_clustering)}`')
 
-    logger.info(f'# of sets of clusters is {len(x)}')
-
     # performing clustering separately
+    if type(x) is DataFrame:
+        x = [x.iloc[:, _] for _ in range(n_sets)]
+
     clustering_results = []
     for i, (_x, _method) in enumerate(zip(x, methods)):
         _clustering_result = cluster_data_1d(_x,
