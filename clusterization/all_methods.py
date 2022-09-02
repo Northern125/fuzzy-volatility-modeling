@@ -67,18 +67,25 @@ def cluster_data(x: Union[list, DataFrame],
         raise ValueError(f'Lengths of `x` and `parameters` should coincide. Got `len(x) = {len(x)}`, '
                          f'`len(n_last_points_to_use_for_clustering) = {len(n_last_points_to_use_for_clustering)}`')
 
+    # replacing `parameters` & `n_last_points_to_use_for_clustering` if they are None
+    if parameters is None:
+        parameters = [None for _ in range(n_sets)]
+    if n_last_points_to_use_for_clustering is None:
+        n_last_points_to_use_for_clustering = [None for _ in range(n_sets)]
+
     # performing clustering separately
     if type(x) is DataFrame:
         x = [x.iloc[:, _] for _ in range(n_sets)]
 
-    clustering_results = []
-    for i, (_x, _method) in enumerate(zip(x, methods)):
-        _clustering_result = cluster_data_1d(_x,
-                                             method=_method,
-                                             parameters=parameters[i] if parameters is not None else None,
-                                             n_last_points_to_use_for_clustering=n_last_points_to_use_for_clustering[i]
-                                             if n_last_points_to_use_for_clustering is not None else None)
-        clustering_results.append(_clustering_result)
+    clustering_results = \
+        [
+            cluster_data_1d(_x,
+                            method=_method,
+                            parameters=_parameters,
+                            n_last_points_to_use_for_clustering=_n_last_points_to_use_for_clustering)
+            for _x, _method, _parameters, _n_last_points_to_use_for_clustering in
+            zip(x, methods, parameters, n_last_points_to_use_for_clustering)
+        ]
 
     logger.debug(f'Sets-wise clustering completed; `clustering_results`: {clustering_results}')
 
