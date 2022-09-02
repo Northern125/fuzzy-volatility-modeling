@@ -19,11 +19,12 @@ class FuzzyVolatilityModel:
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
                  local_method_parameters: dict = None,
-                 data_to_cluster: Union[str, Series] = 'train',
+                 data_to_cluster: Union[str, Series, DataFrame] = 'train',
                  n_last_points_to_use_for_clustering: int = None,
-                 cluster_sets_conjunction: Union['str', callable] = 'prod'):
+                 cluster_sets_conjunction: Union['str', callable] = 'prod',
+                 n_cluster_sets: int = None):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
-        self.logger.info('Creating an instance of FuzzyVolatilityModel')
+        self.logger.info(f'Creating an instance of {self.logger.name}')
 
         self.clusterization_method = clusterization_method
         self.clusterization_parameters = clusterization_parameters
@@ -39,13 +40,23 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
-        if type(data_to_cluster) is str and data_to_cluster == 'train' \
-                or data_to_cluster is None:
+
+        if type(data_to_cluster) is not str and data_to_cluster is not None:
+            self.data_to_cluster = data_to_cluster.copy()
+            if type(self.data_to_cluster) is list:
+                self.data_to_cluster = [self.train_data.copy()
+                                        if type(_elem) is str and _elem == 'train' or _elem is None
+                                        else _elem
+                                        for _elem in self.data_to_cluster]
+                self.data_to_cluster = concat(self.data_to_cluster, axis='columns').copy()
+        elif data_to_cluster == 'train' or data_to_cluster is None:
             self.data_to_cluster = self.train_data.copy()
         else:
-            self.data_to_cluster = data_to_cluster.copy()
+            raise ValueError("""`data_to_cluster` should be either a string 'train' or not a string""")
+
         self.n_last_points_to_use_for_clustering = n_last_points_to_use_for_clustering
         self.cluster_sets_conjunction = cluster_sets_conjunction
+        self.n_cluster_sets = n_cluster_sets
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -75,6 +86,25 @@ class FuzzyVolatilityModel:
         # GARCH variables
         self.h = None
 
+    @staticmethod
+    def _convert_data_to_cluster(data_to_cluster, train_data, variable_name=None):
+        if type(data_to_cluster) is not str and data_to_cluster is not None:
+            converted = data_to_cluster.copy()
+            if type(converted) is list:
+                converted = [train_data.copy()
+                             if type(_elem) is str and _elem == 'train' or _elem is None
+                             else _elem
+                             for _elem in converted]
+                converted = concat(converted, axis='columns').copy()
+        elif data_to_cluster == 'train' or data_to_cluster is None:
+            # for backward compatibility
+            converted = train_data.copy()
+        else:
+            raise ValueError(f"""`{variable_name if variable_name is not None else 'data'}` 
+                                 should be either a string 'train' or not a string""")
+
+        return converted
+
     def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
@@ -91,7 +121,8 @@ class FuzzyVolatilityModel:
                                              parameters=self.clusterization_parameters,
                                              n_last_points_to_use_for_clustering=
                                              self.n_last_points_to_use_for_clustering,
-                                             conjunction=self.cluster_sets_conjunction)
+                                             conjunction=self.cluster_sets_conjunction,
+                                             n_sets=self.n_cluster_sets)
 
         self.clusters_parameters_current = clusterization_result['parameters']
         n_clusters = self.clusters_parameters_current['n_clusters']
@@ -154,7 +185,7 @@ class FuzzyVolatilityModel:
         if type(self.data_to_cluster) is not str:
             self.data_to_cluster.loc[observation_date] = data_to_cluster_point
         elif self.data_to_cluster != 'train':
-            raise Exception("""`data_to_cluster` should be either a string 'train' or not a string""")
+            raise ValueError("""`data_to_cluster` should be either a string 'train' or not a string""")
         self.fit()
 
     def feed_daily_data(self, test_data: Series, data_to_cluster=None):
@@ -163,10 +194,13 @@ class FuzzyVolatilityModel:
             # then do forecast before running the main algorithm
             self.forecast()
 
-        if type(self.data_to_cluster) is str and self.data_to_cluster == 'train':
-            data_to_cluster = test_data
-        elif data_to_cluster is None:
-            raise Exception("""self.data_to_cluster is not 'train', but given data_to_cluster is None""")
+        data_to_cluster = self._convert_data_to_cluster(data_to_cluster,
+                                                        test_data,
+                                                        variable_name='self.data_to_cluster')
+        if (len(data_to_cluster.shape) != len(self.data_to_cluster.shape)) or \
+                (len(data_to_cluster.shape) == len(self.data_to_cluster.shape) == 2 and
+                 data_to_cluster.shape[1] != self.data_to_cluster.shape[1]):
+            raise ValueError('# of columns is different in given `data_to_cluster` and `self.data_to_cluster`')
 
         # imitating live daily algorithm work
         for date in test_data.index:
