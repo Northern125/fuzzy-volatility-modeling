@@ -116,9 +116,14 @@ def cluster_data_1d(x: Union[list, array, Series],
 
     logger = logging.getLogger('cluster_data_1d')
 
-    n = len(x)
-
     slc = slice(-n_last_points_to_use_for_clustering if n_last_points_to_use_for_clustering is not None else None, None)
+    x_sliced = x[slc].copy()
+    n = len(x_sliced)
+
+    logger.debug(f'slc = {slc}')
+    logger.debug(f'n = {n}')
+    logger.debug(f'x: {x}')
+    logger.debug(f'x_sliced: {x_sliced}')
 
     if method == 'gaussian':
         logger.debug('clustering method is gaussian')
@@ -132,7 +137,7 @@ def cluster_data_1d(x: Union[list, array, Series],
             centers = [[center] * n for center in centers]
             cov_matrices = [diag([variance] * n, k=0) for variance in variances]
 
-            membership_degrees = calc_gaussian_membership_degrees(x, centers, cov_matrices)
+            membership_degrees = calc_gaussian_membership_degrees(x_sliced, centers, cov_matrices)
 
             result = {'parameters': parameters, 'membership': membership_degrees}
         else:
@@ -147,7 +152,7 @@ def cluster_data_1d(x: Union[list, array, Series],
             c = parameters['c']
             d = parameters['d']
 
-            membership_degrees = calc_trapezoidal_membership_degrees(x[slc], a, b, c, d)
+            membership_degrees = calc_trapezoidal_membership_degrees(x_sliced, a, b, c, d)
             result = {'parameters': parameters, 'membership': membership_degrees}
         else:
             raise NotImplementedError('Algorithm for automatic trapezoidal clusterization is not implemented '
