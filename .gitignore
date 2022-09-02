@@ -6,8 +6,9 @@ figures/
 *summary_m.xlsx
 current_antecedent_fitting_metadata.pkl
 logs/
-testing_model.ipynb
-seasonal_modeling/testing_model.ipynb
+/testing_model.ipynb
+seasonal_modeling/data_setting_old.ipynb
+*antecedent_fitting_metadata*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
