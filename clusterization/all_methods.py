@@ -13,7 +13,8 @@ def cluster_data(x: Union[list, DataFrame],
                  parameters: list = None,
                  n_last_points_to_use_for_clustering: list = None,
                  conjunction: Union[str, callable] = 'prod',
-                 n_sets: int = None) -> dict:
+                 n_sets: int = None,
+                 normalize: bool = False) -> dict:
     """
     Cluster data given different cluster sets, combine them via Cartesian product and then perform conjunction
     (conjunction method is passed to `conjunction`). For example, if 2 cluster sets are given, first of size 2
@@ -27,6 +28,9 @@ def cluster_data(x: Union[list, DataFrame],
     :param conjunction: `str` in ('prod') or `callable`, conjunction method for combining membership degrees from
     different sets. Default 'prod' -- product
     :param n_sets: int, optional, the number of cluster sets. If None, then inferred from `x` shape
+    :param normalize: bool, whether to normalize the membership degrees in each cluster set so that their sum equals 1.
+    I.e., whether to divide each membership degree by the sum of membership degrees INSIDE OF EACH CLUSTER SET. Setting
+    this to `True` will actually yield final membership degrees (conjunct), which sum is also equal to 1
     :return: `dict` {'parameters': estimated parameters of clusters, 'membership': 1D array of membership degrees
     of all `x`'s to resulting clusters}
     """
@@ -82,7 +86,8 @@ def cluster_data(x: Union[list, DataFrame],
             cluster_data_1d(_x,
                             method=_method,
                             parameters=_parameters,
-                            n_last_points_to_use_for_clustering=_n_last_points_to_use_for_clustering)
+                            n_last_points_to_use_for_clustering=_n_last_points_to_use_for_clustering,
+                            normalize=normalize)
             for _x, _method, _parameters, _n_last_points_to_use_for_clustering in
             zip(x, methods, parameters, n_last_points_to_use_for_clustering)
         ]
@@ -110,13 +115,16 @@ def cluster_data(x: Union[list, DataFrame],
 def cluster_data_1d(x: Union[list, array, Series],
                     method: str = 'gaussian',
                     parameters: dict = None,
-                    n_last_points_to_use_for_clustering: int = None) -> dict:
+                    n_last_points_to_use_for_clustering: int = None,
+                    normalize: bool = False) -> dict:
     """
     Cluster data `x` and calculate membership degrees of `x` to different clusters
     :param x: 1D array-like, input data to cluster
     :param method: str, clustering method
     :param parameters: dict, parameters of the clusterization algorithm (e.g., number of clusters, etc)
     :param n_last_points_to_use_for_clustering: int, number of last points to use in `x` for clustering
+    :param normalize: bool, whether to normalize the resulting membership degrees so that their sum equals 1.
+    I.e., whether to divide each membership degree by the sum of membership degrees
     :return: `dict` {'parameters': estimated parameters of clusters, 'membership': 1D array of membership degrees
     of `x` to clusters}
     """
@@ -166,5 +174,9 @@ def cluster_data_1d(x: Union[list, array, Series],
                                       '(raised because `parameters` is None)')
     else:
         raise Exception('Clustering method name is wrong or method is not implemented')
+
+    if normalize:
+        membership_degrees = membership_degrees / membership_degrees.sum()
+        result['membership'] = membership_degrees
 
     return result

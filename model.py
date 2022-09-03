@@ -22,7 +22,8 @@ class FuzzyVolatilityModel:
                  data_to_cluster: Union[str, Series, DataFrame] = 'train',
                  n_last_points_to_use_for_clustering: int = None,
                  cluster_sets_conjunction: Union['str', callable] = 'prod',
-                 n_cluster_sets: int = None):
+                 n_cluster_sets: int = None,
+                 normalize: bool = False):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
@@ -57,6 +58,7 @@ class FuzzyVolatilityModel:
         self.n_last_points_to_use_for_clustering = n_last_points_to_use_for_clustering
         self.cluster_sets_conjunction = cluster_sets_conjunction
         self.n_cluster_sets = n_cluster_sets
+        self.normalize = normalize
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -122,7 +124,8 @@ class FuzzyVolatilityModel:
                                              n_last_points_to_use_for_clustering=
                                              self.n_last_points_to_use_for_clustering,
                                              conjunction=self.cluster_sets_conjunction,
-                                             n_sets=self.n_cluster_sets)
+                                             n_sets=self.n_cluster_sets,
+                                             normalize=self.normalize)
 
         self.clusters_parameters_current = clusterization_result['parameters']
         n_clusters = self.clusters_parameters_current['n_clusters']
