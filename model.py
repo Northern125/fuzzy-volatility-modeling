@@ -41,6 +41,7 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
+        self.n_clusters = None
 
         if type(data_to_cluster) is not str and data_to_cluster is not None:
             self.data_to_cluster = data_to_cluster.copy()
@@ -107,6 +108,18 @@ class FuzzyVolatilityModel:
 
         return converted
 
+    def _calc_residuals(self, _parameters, p, q, first_h, starting_index):
+        alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=p, q=q, n_clusters=self.n_clusters)
+
+        h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data ** 2, first_h,
+                                weights=self.membership_degrees_current)
+
+        residuals = self.train_data[starting_index:] ** 2 - h[starting_index:-1]
+        self.logger.debug(f'residuals =\n{residuals}')
+        self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
+
+        return residuals
+
     def fit(self, train_data: Series = None):
         if train_data is not None:
             self.train_data = train_data.copy()
@@ -128,7 +141,7 @@ class FuzzyVolatilityModel:
                                              normalize=self.normalize)
 
         self.clusters_parameters_current = clusterization_result['parameters']
-        n_clusters = self.clusters_parameters_current['n_clusters']
+        self.n_clusters = self.clusters_parameters_current['n_clusters']
 
         self.membership_degrees_current = clusterization_result['membership']
 
@@ -151,27 +164,16 @@ class FuzzyVolatilityModel:
         starting_index = max(p, q)
         self.logger.debug(f'starting_index = {starting_index}')
 
-        def calc_residuals(_parameters):
-            alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=p, q=q, n_clusters=n_clusters)
-
-            h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data ** 2, first_h,
-                                    weights=self.membership_degrees_current)
-
-            residuals = self.train_data[starting_index:] ** 2 - h[starting_index:-1]
-            self.logger.debug(f'residuals =\n{residuals}')
-            self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
-
-            return residuals
-
         alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
-        ls_result = least_squares(calc_residuals, parameters_0, bounds=bounds)
+        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=bounds,
+                                  args=(p, q, first_h, starting_index))
 
         parameters = ls_result.x
         self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}')
 
-        self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=n_clusters)
+        self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
 
         self.logger.debug('Fitting is completed')
