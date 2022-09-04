@@ -127,11 +127,7 @@ class FuzzyVolatilityModel:
         # clusterization
         self.logger.debug('Starting clusterization')
 
-        if type(self.data_to_cluster) is str and self.data_to_cluster == 'train':
-            data_to_cluster = self.train_data
-        else:
-            data_to_cluster = self.data_to_cluster
-        clusterization_result = cluster_data(data_to_cluster,
+        clusterization_result = cluster_data(self.data_to_cluster,
                                              methods=self.clusterization_method,
                                              parameters=self.clusterization_parameters,
                                              n_last_points_to_use_for_clustering=
