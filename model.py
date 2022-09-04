@@ -6,7 +6,7 @@ from numpy import array
 from scipy.optimize import least_squares
 
 from clusterization import cluster_data
-from local_models import calc_cond_var
+from local_models import calc_cond_var_fuzzy
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
 module_logger = logging.getLogger(__name__)
@@ -154,8 +154,8 @@ class FuzzyVolatilityModel:
         def calc_residuals(_parameters):
             alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=p, q=q, n_clusters=n_clusters)
 
-            h = calc_cond_var(alpha_0, alpha, beta, self.train_data ** 2, first_h,
-                              fuzzy=True, weights=self.membership_degrees_current)
+            h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data ** 2, first_h,
+                                    weights=self.membership_degrees_current)
 
             residuals = self.train_data[starting_index:] ** 2 - h[starting_index:-1]
             self.logger.debug(f'residuals =\n{residuals}')
@@ -178,8 +178,8 @@ class FuzzyVolatilityModel:
 
     def forecast(self):
         first_h = array(self.local_method_parameters['first_h'])
-        self.h = calc_cond_var(self.alpha_0, self.alpha, self.beta, self.train_data ** 2, first_h,
-                               fuzzy=True, weights=self.membership_degrees_current)
+        self.h = calc_cond_var_fuzzy(self.alpha_0, self.alpha, self.beta, self.train_data ** 2, first_h,
+                                     weights=self.membership_degrees_current)
         self.current_output = self.h[-1]
         self._hist_output.append(self.current_output)
 

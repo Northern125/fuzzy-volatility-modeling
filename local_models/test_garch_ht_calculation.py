@@ -3,7 +3,7 @@ from scipy.stats import norm
 from numpy import array
 import logging
 
-from . import calc_cond_var, calc_ht, calc_fuzzy_ht
+from . import calc_cond_var_fuzzy, calc_cond_var_vanilla, calc_ht, calc_fuzzy_ht
 
 
 class TestCustomGARCHCondVarCalc(unittest.TestCase):
@@ -24,8 +24,7 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         first_h = array([1])
 
         # calculating
-        h_main_fun = calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
-                                   fuzzy=False, weights=None)
+        h_main_fun = calc_cond_var_vanilla(alpha_0, alpha, beta, y_squared, first_h)
         h_aux_fun = calc_ht(alpha_0, alpha, beta, y_squared, first_h)
         logger.debug(f'alpha_0 = {alpha_0}, alpha = {alpha}, beta = {beta}, y_squared = {y_squared}, '
                      f'first_h = {first_h}')
@@ -53,8 +52,8 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         weights = array([1])
 
         # calculating
-        h_main_fun = calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
-                                   fuzzy=True, weights=weights)
+        h_main_fun = calc_cond_var_fuzzy(alpha_0, alpha, beta, y_squared, first_h,
+                                         weights=weights)
         h_aux_fun = calc_fuzzy_ht(alpha_0, alpha, beta, y_squared, first_h, weights)
         logger.debug(f'alpha_0 = {alpha_0}, alpha = {alpha}, beta = {beta}, y_squared = {y_squared}, '
                      f'first_h = {first_h}')
@@ -74,12 +73,11 @@ class TestCustomGARCHCondVarCalc(unittest.TestCase):
         first_h = array([1])
 
         # calculating h_vanilla
-        h_vanilla = calc_cond_var(alpha_0, alpha, beta,
-                                  y_squared=y_squared, first_h=first_h,
-                                  fuzzy=False)
-        h_fuzzy = calc_cond_var(array([alpha_0]), array([alpha]).T, array([beta]),
-                                y_squared=y_squared, first_h=first_h,
-                                fuzzy=True, weights=array([.534]))
+        h_vanilla = calc_cond_var_vanilla(alpha_0, alpha, beta,
+                                          y_squared=y_squared, first_h=first_h)
+        h_fuzzy = calc_cond_var_fuzzy(array([alpha_0]), array([alpha]).T, array([beta]),
+                                      y_squared=y_squared, first_h=first_h,
+                                      weights=array([.534]))
         self.assertEqual(len(h_vanilla), 6)
         self.assertEqual(len(h_fuzzy), 6)
 
