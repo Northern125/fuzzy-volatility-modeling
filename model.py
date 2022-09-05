@@ -31,6 +31,7 @@ class FuzzyVolatilityModel:
         self.clusterization_parameters = clusterization_parameters
         self.local_method = local_method
         self.local_method_parameters = local_method_parameters
+        self.consequent_parameters_ini = self.local_method_parameters['parameters_ini']
 
         if train_data is None:
             self.train_data = Series(dtype=float).copy()
@@ -155,12 +156,15 @@ class FuzzyVolatilityModel:
         q = self.local_method_parameters['q']
         first_h = array(self.local_method_parameters['first_h'])
         bounds = self.local_method_parameters['bounds']
-        parameters_ini = self.local_method_parameters['parameters_ini']
+        # parameters_ini = self.local_method_parameters['parameters_ini']
 
         starting_index = max(p, q)
         self.logger.debug(f'starting_index = {starting_index}')
 
-        alpha_0_ini, alpha_ini, beta_ini = parameters_ini['alpha_0'], parameters_ini['alpha'], parameters_ini['beta']
+        alpha_0_ini, alpha_ini, beta_ini = \
+            self.consequent_parameters_ini['alpha_0'],\
+            self.consequent_parameters_ini['alpha'],\
+            self.consequent_parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
         ls_result = least_squares(self._calc_residuals, parameters_0, bounds=bounds,
@@ -171,6 +175,7 @@ class FuzzyVolatilityModel:
 
         self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
+        # self.consequent_parameters_ini = self._parameters_hist[-1]  # TODO: either uncomment or remove
 
         self.logger.debug('Fitting is completed')
 
