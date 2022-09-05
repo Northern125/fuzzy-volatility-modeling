@@ -86,6 +86,7 @@ class FuzzyVolatilityModel:
         self.alpha = None
         self.beta = None
         self._parameters_hist = []
+        self._ls_results_hist = []
 
         # GARCH variables
         self.h = None
@@ -171,10 +172,12 @@ class FuzzyVolatilityModel:
                                   args=(p, q, first_h, starting_index))
 
         parameters = ls_result.x
-        self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}')
+        self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}, '
+                          f'LS results: {ls_result}')
 
         self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
+        self._ls_results_hist.append(ls_result)
         # self.consequent_parameters_ini = self._parameters_hist[-1]  # TODO: either uncomment or remove
 
         self.logger.debug('Fitting is completed')
