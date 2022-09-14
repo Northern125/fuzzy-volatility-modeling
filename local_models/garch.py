@@ -1,6 +1,5 @@
 from rules_related import combine_rules_outputs
 from numpy import array
-from pandas import IndexSlice as idx
 import logging
 
 
@@ -10,16 +9,12 @@ def calc_ht(alpha_0, alpha, beta, y_squared, h):
 
 
 def calc_fuzzy_ht(alpha_0, alpha, beta, y_squared, h, weights):
-    logger = logging.getLogger('calc_fuzzy_ht')
-
-    outputs = []
     n_clusters = weights.shape[0]
 
-    for j in range(n_clusters):
-        logger.debug(f'Iteration #{j}: ')
-        local_output = calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h)
-        outputs.append(local_output)
-
+    outputs = [
+        calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h)
+        for j in range(n_clusters)
+    ]
     outputs = array(outputs)
 
     result = combine_rules_outputs(outputs, weights)
@@ -27,20 +22,9 @@ def calc_fuzzy_ht(alpha_0, alpha, beta, y_squared, h, weights):
     return result
 
 
-def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
-                  fuzzy=False, weights=None):
-    logger = logging.getLogger('calc_cond_var')
-
-    if fuzzy and weights is None:
-        raise Exception('fuzzy is True, but weights not provided')
-
-    def _calc_ht(_alpha_0, _alpha, _beta, _y_squared, _h):
-        if fuzzy:
-            fun = calc_fuzzy_ht(_alpha_0, _alpha, _beta, _y_squared, _h, weights)
-        else:
-            fun = calc_ht(_alpha_0, _alpha, _beta, _y_squared, _h)
-
-        return fun
+def _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
+                   calc_ht_function: callable = calc_ht, **kwargs) -> array:
+    logger = logging.getLogger('calc_cond_var_fuzzy')
 
     q = len(alpha)
     p = len(beta)
@@ -61,7 +45,7 @@ def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
     for i in range(starting_index, y_len + 1):
         y_slc = slice(i - q, i)
         h_slc = slice(i - p, i)
-        h_t = _calc_ht(alpha_0, alpha, beta, y_squared[y_slc], h[h_slc])
+        h_t = calc_ht_function(alpha_0, alpha, beta, y_squared[y_slc], h[h_slc], **kwargs)
         h.append(h_t)
         logger.debug(f'New iteration; i = {i}: h_t = {h_t}, y_slc = {y_slc}, h_slc = {h_slc}, '
                      f'h[h_slc] = {h[h_slc]}, y_squared[y_slc] =\n{y_squared[y_slc]}')
@@ -69,3 +53,14 @@ def calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
     h = array(h)
 
     return h
+
+
+def calc_cond_var_vanilla(alpha_0, alpha, beta, y_squared, first_h) -> array:
+    return _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
+                          calc_ht_function=calc_ht)
+
+
+def calc_cond_var_fuzzy(alpha_0, alpha, beta, y_squared, first_h, weights) -> array:
+    return _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
+                          weights=weights,
+                          calc_ht_function=calc_fuzzy_ht)
