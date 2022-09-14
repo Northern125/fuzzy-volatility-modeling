@@ -2,7 +2,6 @@ import logging
 from typing import Union
 
 from pandas import Series, DataFrame, concat
-from numpy import array
 from scipy.optimize import least_squares
 
 from clusterization import cluster_data
@@ -23,20 +22,42 @@ class FuzzyVolatilityModel:
                  n_last_points_to_use_for_clustering: int = None,
                  cluster_sets_conjunction: Union['str', callable] = 'prod',
                  n_cluster_sets: int = None,
-                 normalize: bool = False):
+                 normalize: bool = False,
+                 n_points_fitting: int = None,
+                 first_h: Series = None):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
-        self.clusterization_method = clusterization_method
-        self.clusterization_parameters = clusterization_parameters
-        self.local_method = local_method
-        self.local_method_parameters = local_method_parameters
-        self.consequent_parameters_ini = self.local_method_parameters['parameters_ini']
-
+        # train data
         if train_data is None:
             self.train_data = Series(dtype=float).copy()
         else:
             self.train_data = train_data.copy()
+
+        # antecedent metaparameters
+        self.clusterization_method = clusterization_method
+        self.clusterization_parameters = clusterization_parameters
+
+        # consequent metaparameters
+        self.local_method = local_method
+        self.local_method_parameters = local_method_parameters
+
+        self.consequent_parameters_ini = self.local_method_parameters['parameters_ini']
+        self.n_points_fitting = n_points_fitting
+        self._fitting_slice = slice(-self.n_points_fitting if self.n_points_fitting is not None else None, None)
+        self.bounds = self.local_method_parameters['bounds']
+        self.p = self.local_method_parameters['p']
+        self.q = self.local_method_parameters['q']
+        self.starting_index = max(self.p, self.q)
+        if first_h is None:
+            self.first_h_current = self.train_data[:self.starting_index] ** 2
+        else:
+            self.first_h_current = first_h.copy()
+
+        if self.n_points_fitting is not None and self.n_points_fitting > len(self.train_data):
+            raise ValueError('`n_points_fitting` should not be greater than '
+                             '`len(train_data) - max(p, q)`; '
+                             f'got {self.n_points_fitting} > {len(self.train_data) - self.starting_index}')
 
         # clusters parameters
         self._clusters_parameters_hist = []
@@ -77,10 +98,6 @@ class FuzzyVolatilityModel:
         self.hist_output = Series(dtype=float).copy()
         self.current_output = None
 
-        # garch objects
-        # self.garch_models = []
-        # self.fitted_garch_models = []
-
         # consequent parameters
         self.alpha_0 = None
         self.alpha = None
@@ -90,6 +107,7 @@ class FuzzyVolatilityModel:
 
         # GARCH variables
         self.h = None
+        self._h_hist = []
 
     @staticmethod
     def _convert_data_to_cluster(data_to_cluster, train_data, variable_name=None):
@@ -110,22 +128,31 @@ class FuzzyVolatilityModel:
 
         return converted
 
-    def _calc_residuals(self, _parameters, p, q, first_h, starting_index):
-        alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=p, q=q, n_clusters=self.n_clusters)
+    def _calc_residuals(self, _parameters):
+        alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
 
-        h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data ** 2, first_h,
+        h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data[self._fitting_slice] ** 2, self.first_h_current,
                                 weights=self.membership_degrees_current)
 
-        residuals = self.train_data[starting_index:] ** 2 - h[starting_index:-1]
+        residuals = self.train_data[self._fitting_slice][self.starting_index:] ** 2 - h[self.starting_index:-1]
         self.logger.debug(f'residuals =\n{residuals}')
         self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
 
         return residuals
 
-    def fit(self, train_data: Series = None):
+    def fit(self, train_data: Series = None, n_points: int = None):
         if train_data is not None:
             self.train_data = train_data.copy()
 
+        _fitting_slice_ini = self._fitting_slice
+        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+
+        self._fit()
+
+        # resetting fitting slice back to what it was at initialization
+        self._fitting_slice = _fitting_slice_ini
+
+    def _fit(self):
         # clusterization
         self.logger.debug('Starting clusterization')
 
@@ -150,42 +177,46 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
 
-        # fitting local models within each rule
+        # fitting consequent parameters
         self.logger.debug('Starting to fit local model within each rule')
-
-        p = self.local_method_parameters['p']
-        q = self.local_method_parameters['q']
-        first_h = array(self.local_method_parameters['first_h'])
-        bounds = self.local_method_parameters['bounds']
-        # parameters_ini = self.local_method_parameters['parameters_ini']
-
-        starting_index = max(p, q)
-        self.logger.debug(f'starting_index = {starting_index}')
 
         alpha_0_ini, alpha_ini, beta_ini = \
             self.consequent_parameters_ini['alpha_0'],\
             self.consequent_parameters_ini['alpha'],\
             self.consequent_parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
+
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
-        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=bounds,
-                                  args=(p, q, first_h, starting_index))
+        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds)
 
         parameters = ls_result.x
         self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}, '
                           f'LS results: {ls_result}')
 
-        self.alpha_0, self.alpha, self.beta = unpack_1d_parameters(parameters, p=p, q=q, n_clusters=self.n_clusters)
+        self.alpha_0, self.alpha, self.beta = \
+            unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
         self._ls_results_hist.append(ls_result)
-        # self.consequent_parameters_ini = self._parameters_hist[-1]  # TODO: either uncomment or remove
+        self.consequent_parameters_ini = self._parameters_hist[-1]
 
         self.logger.debug('Fitting is completed')
 
-    def forecast(self):
-        first_h = array(self.local_method_parameters['first_h'])
-        self.h = calc_cond_var_fuzzy(self.alpha_0, self.alpha, self.beta, self.train_data ** 2, first_h,
+    def forecast(self, n_points: int = None):
+        _fitting_slice_ini = self._fitting_slice
+        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+
+        self._forecast()
+
+        # resetting fitting slice back to what it was at initialization
+        self._fitting_slice = _fitting_slice_ini
+
+    def _forecast(self):
+        # first_h = array(self.local_method_parameters['first_h'])
+        self.h = calc_cond_var_fuzzy(self.alpha_0, self.alpha, self.beta,
+                                     self.train_data[self._fitting_slice] ** 2, self.first_h_current,
                                      weights=self.membership_degrees_current)
+
+        self._h_hist.append(self.h)
         self.current_output = self.h[-1]
         self._hist_output.append(self.current_output)
 
@@ -195,13 +226,22 @@ class FuzzyVolatilityModel:
             self.data_to_cluster.loc[observation_date] = data_to_cluster_point
         elif self.data_to_cluster != 'train':
             raise ValueError("""`data_to_cluster` should be either a string 'train' or not a string""")
-        self.fit()
 
-    def feed_daily_data(self, test_data: Series, data_to_cluster=None):
+        self.first_h_current = self.train_data[self._fitting_slice][:self.starting_index] ** 2
+        self._fit()
+
+    def feed_daily_data(self, test_data: Series, data_to_cluster=None, n_points: int = None):
         if self.current_output is None:
-            # if there is no current forecast (AKA the model has just been created),
+            # if there is no current forecast (i.e., only initial fitting was performed),
             # then do forecast before running the main algorithm
-            self.forecast()
+
+            _fitting_slice_ini = self._fitting_slice
+            self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+
+            self.forecast(n_points=n_points)
+
+            # resetting fitting slice back to what it was at initialization
+            self._fitting_slice = _fitting_slice_ini
 
         data_to_cluster = self._convert_data_to_cluster(data_to_cluster,
                                                         test_data,
@@ -216,7 +256,7 @@ class FuzzyVolatilityModel:
             observation = test_data.loc[date]
             data_to_cluster_point = data_to_cluster.loc[date]
             self._push(observation, date, data_to_cluster_point)
-            self.forecast()
+            self._forecast()
 
         # adding dates
         dates = test_data.index.copy()
