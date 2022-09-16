@@ -2,13 +2,16 @@ import logging
 from typing import Union
 
 from pandas import Series, DataFrame, concat
-from scipy.optimize import least_squares
+from numpy import array
+from scipy.optimize import least_squares, differential_evolution
 
 from clusterization import cluster_data
 from local_models import calc_cond_var_fuzzy
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
 module_logger = logging.getLogger(__name__)
+
+OPTIMIZATION_ALGORITHMS = ['ls', 'differential evolution']
 
 
 class FuzzyVolatilityModel:
@@ -24,7 +27,9 @@ class FuzzyVolatilityModel:
                  n_cluster_sets: int = None,
                  normalize: bool = False,
                  n_points_fitting: int = None,
-                 first_h: Series = None):
+                 first_h: Series = None,
+                 optimization: str = 'ls',
+                 optimization_parameters=None):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
@@ -109,6 +114,21 @@ class FuzzyVolatilityModel:
         self.h = None
         self._h_hist = []
 
+        # optimization algorithm
+        if optimization == 'ls':
+            self._fit = self._fit_ls
+        elif optimization == 'differential evolution':
+            self._fit = self._fit_de
+            self.bounds = array(self.bounds).T  # scipy's `differential_evolution` takes bounds in different form
+        else:
+            raise ValueError(f'Optimization algorithms other than {OPTIMIZATION_ALGORITHMS} are not supported; '
+                             f'got {optimization}')
+
+        if optimization_parameters is None:
+            self.optimization_parameters = {}
+        else:
+            self.optimization_parameters = optimization_parameters
+
     @staticmethod
     def _convert_data_to_cluster(data_to_cluster, train_data, variable_name=None):
         if type(data_to_cluster) is not str and data_to_cluster is not None:
@@ -139,6 +159,9 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
 
         return residuals
+
+    def _calc_rss(self, _parameters):
+        return (self._calc_residuals(_parameters) ** 2).sum()
 
     def cluster(self):
         self.logger.debug('Starting clusterization')
@@ -176,17 +199,16 @@ class FuzzyVolatilityModel:
         # resetting fitting slice back to what it was at initialization
         self._fitting_slice = _fitting_slice_ini
 
-    def _fit(self):
+    def _fit_ls(self):
         self.logger.debug('Starting fitting')
 
-        alpha_0_ini, alpha_ini, beta_ini = \
-            self.consequent_parameters_ini['alpha_0'], \
-            self.consequent_parameters_ini['alpha'], \
-            self.consequent_parameters_ini['beta']
-        parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
+        parameters_0 = pack_1d_parameters(self.consequent_parameters_ini['alpha_0'],
+                                          self.consequent_parameters_ini['alpha'],
+                                          self.consequent_parameters_ini['beta'])
 
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
         ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds)
+        self._ls_results_hist.append(ls_result)
 
         parameters = ls_result.x
         self.logger.debug(f'Least squares estimation finished; estimated parameters = {parameters}, '
@@ -195,7 +217,26 @@ class FuzzyVolatilityModel:
         self.alpha_0, self.alpha, self.beta = \
             unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
+        self.consequent_parameters_ini = self._parameters_hist[-1]
+
+        self.logger.debug('Fitting is completed')
+
+    def _fit_de(self):
+        self.logger.debug('Starting fitting')
+
+        parameters_0 = pack_1d_parameters(self.consequent_parameters_ini['alpha_0'],
+                                          self.consequent_parameters_ini['alpha'],
+                                          self.consequent_parameters_ini['beta'])
+
+        ls_result = differential_evolution(self._calc_rss, bounds=self.bounds, x0=parameters_0,
+                                           **self.optimization_parameters)
         self._ls_results_hist.append(ls_result)
+
+        parameters = ls_result.x
+        self.alpha_0, self.alpha, self.beta = \
+            unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
+
+        self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
         self.consequent_parameters_ini = self._parameters_hist[-1]
 
         self.logger.debug('Fitting is completed')
