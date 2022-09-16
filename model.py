@@ -140,30 +140,17 @@ class FuzzyVolatilityModel:
 
         return residuals
 
-    def fit(self, train_data: Series = None, n_points: int = None):
-        if train_data is not None:
-            self.train_data = train_data.copy()
-
-        _fitting_slice_ini = self._fitting_slice
-        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
-
-        self._fit()
-
-        # resetting fitting slice back to what it was at initialization
-        self._fitting_slice = _fitting_slice_ini
-
-    def _fit(self):
-        # clusterization
+    def cluster(self):
         self.logger.debug('Starting clusterization')
 
-        clusterization_result = cluster_data(self.data_to_cluster,
-                                             methods=self.clusterization_method,
-                                             parameters=self.clusterization_parameters,
-                                             n_last_points_to_use_for_clustering=
-                                             self.n_last_points_to_use_for_clustering,
-                                             conjunction=self.cluster_sets_conjunction,
-                                             n_sets=self.n_cluster_sets,
-                                             normalize=self.normalize)
+        clusterization_result = \
+            cluster_data(self.data_to_cluster,
+                         methods=self.clusterization_method,
+                         parameters=self.clusterization_parameters,
+                         n_last_points_to_use_for_clustering=self.n_last_points_to_use_for_clustering,
+                         conjunction=self.cluster_sets_conjunction,
+                         n_sets=self.n_cluster_sets,
+                         normalize=self.normalize)
 
         self.clusters_parameters_current = clusterization_result['parameters']
         self.n_clusters = self.clusters_parameters_current['n_clusters']
@@ -177,12 +164,24 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
 
-        # fitting consequent parameters
-        self.logger.debug('Starting to fit local model within each rule')
+    def fit(self, train_data: Series = None, n_points: int = None):
+        if train_data is not None:
+            self.train_data = train_data.copy()
+
+        _fitting_slice_ini = self._fitting_slice
+        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+
+        self._fit()
+
+        # resetting fitting slice back to what it was at initialization
+        self._fitting_slice = _fitting_slice_ini
+
+    def _fit(self):
+        self.logger.debug('Starting fitting')
 
         alpha_0_ini, alpha_ini, beta_ini = \
-            self.consequent_parameters_ini['alpha_0'],\
-            self.consequent_parameters_ini['alpha'],\
+            self.consequent_parameters_ini['alpha_0'], \
+            self.consequent_parameters_ini['alpha'], \
             self.consequent_parameters_ini['beta']
         parameters_0 = pack_1d_parameters(alpha_0_ini, alpha_ini, beta_ini)
 
@@ -228,6 +227,8 @@ class FuzzyVolatilityModel:
             raise ValueError("""`data_to_cluster` should be either a string 'train' or not a string""")
 
         self.first_h_current = self.train_data[self._fitting_slice][:self.starting_index] ** 2
+
+        self.cluster()
         self._fit()
 
     def feed_daily_data(self, test_data: Series, data_to_cluster=None, n_points: int = None):
