@@ -17,8 +17,12 @@ def fit_antecedent_params(train,
                           data_to_cluster_test=None,
                           cluster_sets_conjunction=None,
                           n_last_points_to_use_for_clustering=None,
-                          n_cluster_sets=None):
+                          n_cluster_sets=None,
+                          other_fvm_parameters: dict = None):
     logger = logging.getLogger('fit_antecedent_params')
+
+    if other_fvm_parameters is None:
+        other_fvm_parameters = {}
 
     consequent_metaparams = consequent_metaparams.copy()
 
@@ -84,7 +88,11 @@ def fit_antecedent_params(train,
                                        local_method_parameters=consequent_metaparams,
                                        data_to_cluster=data_to_cluster_train,
                                        n_last_points_to_use_for_clustering=n_last_points_to_use_for_clustering,
-                                       cluster_sets_conjunction=cluster_sets_conjunction)
+                                       cluster_sets_conjunction=cluster_sets_conjunction,
+                                       **other_fvm_parameters)
+
+            # clustering
+            fvm.cluster()
 
             # fitting
             fvm.fit()
