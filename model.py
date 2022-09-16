@@ -278,3 +278,10 @@ class FuzzyVolatilityModel:
         clusters_parameters_hist_new = DataFrame.from_records(self._clusters_parameters_hist[slc], index=dates).copy()
         self.clusters_parameters_hist = concat([self.clusters_parameters_hist, clusters_parameters_hist_new],
                                                axis='index').copy()
+
+    def show_ls_results(self):
+        _attrs = ['cost', 'optimality', 'nfev', 'njev', 'status', 'message', 'success']
+        ls_res = DataFrame.from_records([{_attr: _ls_res[_attr] for _attr in _attrs}
+                                         for _ls_res in self._ls_results_hist]).copy()
+
+        return ls_res
