@@ -27,6 +27,8 @@ def _try_fitting(_antecedent_params,
                  other_fvm_parameters,
                  q) -> dict:
     logger = logging.getLogger('_try_fitting')
+    logger.info('Starting')
+    logger.debug(f'_antecedent_params: {_antecedent_params}')
 
     try:
         # parameters_ini (for LS)
@@ -66,6 +68,8 @@ def _try_fitting(_antecedent_params,
         mse = mean_squared_error(fvm.hist_output, test ** 2, squared=True)
         mape = mean_absolute_percentage_error(fvm.hist_output, test ** 2)
 
+        logger.debug('Fitting iteration completed successfully')
+
         return {'status': 0,
                 'fvm': fvm,
                 'mse': mse,
@@ -99,6 +103,9 @@ def fit_antecedent_params(train,
                           use_multiprocessing: bool = False,
                           pool_params: dict = None,
                           starmap_params: dict = None) -> list:
+    logger = logging.getLogger('fit_antecedent_params')
+    logger.info(f'Starting')
+
     if other_fvm_parameters is None:
         other_fvm_parameters = {}
     if pool_params is None:
@@ -162,6 +169,8 @@ def fit_antecedent_params(train,
     unpacked_params = [(_antecedent_params_set, _n_clusters, *_dup) for
                        _antecedent_params_set, _n_clusters, _dup in zipped_params]
 
+    logger.info('Beginning the loop')
+
     if use_multiprocessing:
         with Pool(**pool_params) as p:
             fitting_results = p.starmap(_try_fitting, unpacked_params, **starmap_params)
@@ -169,6 +178,6 @@ def fit_antecedent_params(train,
         for _antecedent_params_set, _n_clusters, _other_params in zipped_params:
             fitting_results.append(_try_fitting(_antecedent_params_set, _n_clusters, *_other_params))
 
-    # return {'fvms': fvms, 'mses': mses, 'mapes': mapes, 'exceptions': exceptions, 'tracebacks': tracebacks}
+    logger.info('Loop ended')
 
     return fitting_results
