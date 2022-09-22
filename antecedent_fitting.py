@@ -7,26 +7,26 @@ from multiprocessing import Pool
 from model import FuzzyVolatilityModel
 
 
-def _try_fitting(_antecedent_params,
-                 _n_clusters,
+def _create_cluster_fit_feed(_antecedent_params,
+                             _n_clusters,
 
-                 alpha_0_ini_1cl,
-                 alpha_ini_1cl,
-                 beta_ini_1cl,
-                 consequent_metaparams,
-                 lower_bounds_1cl,
-                 upper_bounds_1cl,
-                 train,
-                 test,
-                 clusterization_method,
-                 local_method,
-                 data_to_cluster_train,
-                 data_to_cluster_test,
-                 n_last_points_to_use_for_clustering,
-                 cluster_sets_conjunction,
-                 other_fvm_parameters,
-                 q) -> dict:
-    logger = logging.getLogger('_try_fitting')
+                             alpha_0_ini_1cl,
+                             alpha_ini_1cl,
+                             beta_ini_1cl,
+                             consequent_metaparams,
+                             lower_bounds_1cl,
+                             upper_bounds_1cl,
+                             train,
+                             test,
+                             clusterization_method,
+                             local_method,
+                             data_to_cluster_train,
+                             data_to_cluster_test,
+                             n_last_points_to_use_for_clustering,
+                             cluster_sets_conjunction,
+                             other_fvm_parameters,
+                             q) -> dict:
+    logger = logging.getLogger('_create_cluster_fit_feed')
     logger.info('Starting')
     logger.debug(f'_antecedent_params: {_antecedent_params}')
 
@@ -87,6 +87,86 @@ def _try_fitting(_antecedent_params,
                 'traceback': traceback.format_exc()}
 
 
+def _create_cluster_fit_forecast(_antecedent_params,
+                                 _n_clusters,
+
+                                 alpha_0_ini_1cl,
+                                 alpha_ini_1cl,
+                                 beta_ini_1cl,
+                                 consequent_metaparams,
+                                 lower_bounds_1cl,
+                                 upper_bounds_1cl,
+                                 train,
+                                 test,
+                                 clusterization_method,
+                                 local_method,
+                                 data_to_cluster_train,
+                                 data_to_cluster_test,
+                                 n_last_points_to_use_for_clustering,
+                                 cluster_sets_conjunction,
+                                 other_fvm_parameters,
+                                 q) -> dict:
+    logger = logging.getLogger('_create_cluster_fit_forecast')
+    logger.info('Starting')
+    logger.debug(f'_antecedent_params: {_antecedent_params}')
+
+    try:
+        # parameters_ini (for LS)
+        alpha_0_ini = array([alpha_0_ini_1cl] * _n_clusters)
+        alpha_ini = array([alpha_ini_1cl] * _n_clusters).T
+        beta_ini = array([beta_ini_1cl] * _n_clusters).T
+
+        parameters_ini = {'alpha_0': alpha_0_ini, 'alpha': alpha_ini, 'beta': beta_ini}
+
+        consequent_metaparams['parameters_ini'] = parameters_ini
+
+        bounds = [[_bounds[0]] * _n_clusters +
+                  _bounds[1:1 + q] * _n_clusters +
+                  _bounds[1 + q:] * _n_clusters
+                  for _bounds in (lower_bounds_1cl, upper_bounds_1cl)]
+        bounds = tuple(bounds)
+
+        consequent_metaparams['bounds'] = bounds
+
+        # creating model instance
+        fvm = FuzzyVolatilityModel(train,
+                                   clusterization_method=clusterization_method,
+                                   clusterization_parameters=_antecedent_params,
+                                   local_method=local_method,
+                                   local_method_parameters=consequent_metaparams,
+                                   data_to_cluster=data_to_cluster_train,
+                                   n_last_points_to_use_for_clustering=n_last_points_to_use_for_clustering,
+                                   cluster_sets_conjunction=cluster_sets_conjunction,
+                                   **other_fvm_parameters)
+
+        # clustering, fitting, testing
+        fvm.cluster()
+        fvm.fit()
+        fvm.forecast()
+
+        # calculating errors
+        mse = mean_squared_error(fvm.h[:-1], fvm.train_data.values ** 2, squared=True)
+        mape = mean_absolute_percentage_error(fvm.h[:-1], fvm.train_data.values ** 2)
+
+        logger.debug('Fitting iteration completed successfully')
+
+        return {'status': 0,
+                'fvm': fvm,
+                'mse': mse,
+                'mape': mape,
+                'exception': None,
+                'traceback': None}
+    except Exception as e:
+        logger.exception(f'Fitting iteration failed: {e}')
+
+        return {'status': -1,
+                'fvm': None,
+                'mse': None,
+                'mape': None,
+                'exception': e,
+                'traceback': traceback.format_exc()}
+
+
 def fit_antecedent_params(train,
                           test,
                           consequent_metaparams,
@@ -102,7 +182,8 @@ def fit_antecedent_params(train,
                           other_fvm_parameters: dict = None,
                           use_multiprocessing: bool = False,
                           pool_params: dict = None,
-                          starmap_params: dict = None) -> list:
+                          starmap_params: dict = None,
+                          do_feeding: bool = True) -> list:
     logger = logging.getLogger('fit_antecedent_params')
     logger.info(f'Starting')
 
@@ -165,6 +246,12 @@ def fit_antecedent_params(train,
         )
         for _ in range(len(antecedent_params_set))
     ]
+
+    if do_feeding:
+        _do_one_iteration = _create_cluster_fit_feed
+    else:
+        _do_one_iteration = _create_cluster_fit_forecast
+
     zipped_params = list(zip(antecedent_params_set, n_clusters, duplicated_params))
     unpacked_params = [(_antecedent_params_set, _n_clusters, *_dup) for
                        _antecedent_params_set, _n_clusters, _dup in zipped_params]
@@ -173,10 +260,10 @@ def fit_antecedent_params(train,
 
     if use_multiprocessing:
         with Pool(**pool_params) as p:
-            fitting_results = p.starmap(_try_fitting, unpacked_params, **starmap_params)
+            fitting_results = p.starmap(_do_one_iteration, unpacked_params, **starmap_params)
     else:
         for _antecedent_params_set, _n_clusters, _other_params in zipped_params:
-            fitting_results.append(_try_fitting(_antecedent_params_set, _n_clusters, *_other_params))
+            fitting_results.append(_do_one_iteration(_antecedent_params_set, _n_clusters, *_other_params))
 
     logger.info('Loop ended')
 
