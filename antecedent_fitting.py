@@ -66,22 +66,27 @@ def _create_cluster_fit_feed(_antecedent_params,
 
         # calculating errors
         mse = mean_squared_error(fvm.hist_output, test ** 2, squared=True)
+        rmse = mean_squared_error(fvm.hist_output, test ** 2, squared=False)
         mape = mean_absolute_percentage_error(fvm.hist_output, test ** 2)
 
         logger.debug('Fitting iteration completed successfully')
 
-        return {'status': 0,
+        return {'antecedent_params': _antecedent_params,
+                'status': 0,
                 'fvm': fvm,
                 'mse': mse,
+                'rmse': rmse,
                 'mape': mape,
                 'exception': None,
                 'traceback': None}
     except Exception as e:
         logger.exception(f'Fitting iteration failed: {e}')
 
-        return {'status': -1,
+        return {'antecedent_params': _antecedent_params,
+                'status': -1,
                 'fvm': None,
                 'mse': None,
+                'rmse': None,
                 'mape': None,
                 'exception': e,
                 'traceback': traceback.format_exc()}
@@ -146,22 +151,27 @@ def _create_cluster_fit_forecast(_antecedent_params,
 
         # calculating errors
         mse = mean_squared_error(fvm.h[:-1], fvm.train_data.values ** 2, squared=True)
+        rmse = mean_squared_error(fvm.h[:-1], fvm.train_data.values ** 2, squared=False)
         mape = mean_absolute_percentage_error(fvm.h[:-1], fvm.train_data.values ** 2)
 
         logger.debug('Fitting iteration completed successfully')
 
-        return {'status': 0,
+        return {'antecedent_params': _antecedent_params,
+                'status': 0,
                 'fvm': fvm,
                 'mse': mse,
+                'rmse': rmse,
                 'mape': mape,
                 'exception': None,
                 'traceback': None}
     except Exception as e:
         logger.exception(f'Fitting iteration failed: {e}')
 
-        return {'status': -1,
+        return {'antecedent_params': _antecedent_params,
+                'status': -1,
                 'fvm': None,
                 'mse': None,
+                'rmse': None,
                 'mape': None,
                 'exception': e,
                 'traceback': traceback.format_exc()}
@@ -265,6 +275,6 @@ def fit_antecedent_params(train,
         for _antecedent_params_set, _n_clusters, _other_params in zipped_params:
             fitting_results.append(_do_one_iteration(_antecedent_params_set, _n_clusters, *_other_params))
 
-    logger.info('Loop ended')
+    logger.info('Calculation finished')
 
     return fitting_results
