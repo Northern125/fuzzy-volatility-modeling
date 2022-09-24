@@ -41,7 +41,6 @@ def cluster_data(x: Union[list, DataFrame],
     # workaround for backward compatibility (if given variables are 1D)
     if ((type(x) is array or type(x) is Series) and len(x.shape) == 1) or \
             (type(x) is list and array(x).dtype != object and len(array(x).shape) == 1) or \
-            (type(x) is DataFrame and x.shape[1] == 1) or \
             n_sets == 1:
         logger.debug('`x` is a 1D array, putting it and other variables into lists')
         x = [x].copy()
