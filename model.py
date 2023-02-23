@@ -29,7 +29,7 @@ class FuzzyVolatilityModel:
                  n_points_fitting: int = None,
                  first_h: Series = None,
                  optimization: str = 'ls',
-                 optimization_parameters=None):
+                 optimization_parameters: dict = None):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
