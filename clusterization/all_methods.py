@@ -164,7 +164,7 @@ def cluster_data_1d(x: Union[list, array, Series, DataFrame],
 
     slc = slice(-n_last_points_to_use_for_clustering if n_last_points_to_use_for_clustering is not None else None, None)
     x_sliced = x[slc].copy()
-    n = len(x_sliced)
+    n = len(x_sliced)  # dimension of the space subject to clustering
 
     logger.debug(f'slc = {slc}')
     logger.debug(f'n = {n}')
@@ -220,6 +220,7 @@ def cluster_data_1d(x: Union[list, array, Series, DataFrame],
         focals_current = clusterization_parameters['focals']
 
         t = x.shape[0]
+        n = x.shape[1]
 
         if membership_function == 'gaussian':
             sigma_new, beta_new, focals_new, potentials_focal_new = \
