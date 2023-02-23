@@ -4,24 +4,32 @@ from numpy import diag, array
 from pandas import Series, DataFrame
 from itertools import product
 
+from .ets import update_antecedent_part
 from .gaussian import calc_gaussian_membership_degrees
 from membership_functions import calc_trapezoidal_membership_degrees
+
+CLUSTERING_METHODS = ('gaussian', 'trapezoidal', 'eTS', 'eClustering')
 
 
 def cluster_data(x: Union[list, DataFrame],
                  methods: list,
+                 membership_functions: list = None,
                  parameters: list = None,
                  n_last_points_to_use_for_clustering: list = None,
                  conjunction: Union[str, callable] = 'prod',
                  n_sets: int = None,
-                 normalize: bool = False) -> dict:
+                 normalize: bool = False,
+                 clusterization_parameters: list = None,
+                 ) -> dict:
     """
     Cluster data given different cluster sets, combine them via Cartesian product and then perform conjunction
     (conjunction method is passed to `conjunction`). For example, if 2 cluster sets are given, first of size 2
     and second of size 3, the resulting # of clusters will be 6.
+
     :param x: 2D array-like, input data to cluster for each cluster set
     :param methods: 1D list of `str`, method for each cluster set
-    :param parameters: 1D list of `dict`, parameters of the clusterization algorithm (e.g., number of clusters, etc)
+    :param membership_functions: 1D list of str, name of the membership function (e.g., 'gaussian') for each cluster set
+    :param parameters: 1D list of `dict`, parameters of clusters (e.g., number of clusters, centers, variances, etc)
     for each cluster set
     :param n_last_points_to_use_for_clustering: 1D list of `int`, number of last points to use in `x[i]` for clustering
     for each i-th cluster set
@@ -31,10 +39,15 @@ def cluster_data(x: Union[list, DataFrame],
     :param normalize: bool, whether to normalize the membership degrees in each cluster set so that their sum equals 1.
     I.e., whether to divide each membership degree by the sum of membership degrees INSIDE OF EACH CLUSTER SET. Setting
     this to `True` will actually yield final membership degrees (conjunct), which sum is also equal to 1
+    :param clusterization_parameters: 1D list of dict, parameters of the clustering algorithm for each cluster set
+
     :return: `dict` {'parameters': estimated parameters of clusters, 'membership': 1D array of membership degrees
     of all `x`'s to resulting clusters}
     """
     logger = logging.getLogger('cluster_data')
+
+    if membership_functions is None:
+        membership_functions = ['gaussian', 'trapezoidal']
 
     x = x.copy()
 
@@ -49,6 +62,10 @@ def cluster_data(x: Union[list, DataFrame],
             parameters = [parameters]
         if n_last_points_to_use_for_clustering is not None:
             n_last_points_to_use_for_clustering = [n_last_points_to_use_for_clustering]
+        if membership_functions is not None:
+            membership_functions = [membership_functions]
+        if clusterization_parameters is not None:
+            clusterization_parameters = [clusterization_parameters]
 
     # inferring `n_sets` if not given and checking length of `x` otherwise
     _n_sets_inferred = len(x) if type(x) is not DataFrame else x.shape[1]
@@ -75,6 +92,10 @@ def cluster_data(x: Union[list, DataFrame],
         parameters = [None for _ in range(n_sets)]
     if n_last_points_to_use_for_clustering is None:
         n_last_points_to_use_for_clustering = [None for _ in range(n_sets)]
+    if membership_functions is None:
+        membership_functions = [None for _ in range(n_sets)]
+    if clusterization_parameters is None:
+        clusterization_parameters = [None for _ in range(n_sets)]
 
     # performing clustering separately
     if type(x) is DataFrame:
@@ -84,11 +105,15 @@ def cluster_data(x: Union[list, DataFrame],
         [
             cluster_data_1d(_x,
                             method=_method,
+                            membership_function=_membership_function,
                             parameters=_parameters,
                             n_last_points_to_use_for_clustering=_n_last_points_to_use_for_clustering,
-                            normalize=normalize)
-            for _x, _method, _parameters, _n_last_points_to_use_for_clustering in
-            zip(x, methods, parameters, n_last_points_to_use_for_clustering)
+                            normalize=normalize,
+                            clusterization_parameters=_clusterization_parameters)
+            for _x, _method, _membership_function, _parameters, _n_last_points_to_use_for_clustering,
+                _clusterization_parameters in
+            zip(x, methods, membership_functions, parameters, n_last_points_to_use_for_clustering,
+                clusterization_parameters)
         ]
 
     logger.debug(f'Sets-wise clustering completed; `clustering_results`: {clustering_results}')
@@ -111,21 +136,28 @@ def cluster_data(x: Union[list, DataFrame],
     return {'parameters': parameters_final, 'membership': membership_degrees}
 
 
-def cluster_data_1d(x: Union[list, array, Series],
+def cluster_data_1d(x: Union[list, array, Series, DataFrame],
                     method: str = 'gaussian',
+                    membership_function: str = 'gaussian',
                     parameters: dict = None,
                     n_last_points_to_use_for_clustering: int = None,
-                    normalize: bool = False) -> dict:
+                    normalize: bool = False,
+                    clusterization_parameters: dict = None) -> dict:
     """
     Cluster data `x` and calculate membership degrees of `x` to different clusters
-    :param x: 1D array-like, input data to cluster
+    :param x: input data to cluster;
+    IF method is one of ('gaussian', 'trapezoidal'): 1D array-like;
+    ELIF method is one of ('eTS', 'eClustering'): pandas.DataFrame
+
     :param method: str, clustering method
-    :param parameters: dict, parameters of the clusterization algorithm (e.g., number of clusters, etc)
+    :param membership_function: str, name of the membership function (e.g., 'gaussian')
+    :param parameters: dict, parameters of clusters (e.g., number of clusters, centers, variances, etc)
     :param n_last_points_to_use_for_clustering: int, number of last points to use in `x` for clustering
     :param normalize: bool, whether to normalize the resulting membership degrees so that their sum equals 1.
     I.e., whether to divide each membership degree by the sum of membership degrees
+    :param clusterization_parameters: dict, parameters of the clustering algorithm
     :return: `dict` {'parameters': estimated parameters of clusters, 'membership': 1D array of membership degrees
-    of `x` to clusters}
+    of `x` to clusters[, 'clusterization_parameters': parameters of the clustering method]}
     """
 
     logger = logging.getLogger('cluster_data_1d')
@@ -171,8 +203,71 @@ def cluster_data_1d(x: Union[list, array, Series],
         else:
             raise NotImplementedError('Algorithm for automatic trapezoidal clusterization is not implemented '
                                       '(raised because `parameters` is None)')
+    elif method == 'eTS':
+        # x is t by (n + 1) or t by n matrix, where t is a current time step, n is a length of the input vector
+        # it's t by (n + 1) in case when output (y) is also clustered
+        if type(x) is not DataFrame:
+            raise ValueError(f'`x` should be a pandas.DataFrame; got `type(x)` = {type(x)}')
+        if n_last_points_to_use_for_clustering is not None:
+            raise ValueError(f'For clustering method {method} `n_last_points_to_use_for_clustering` should be None; '
+                             f'got {n_last_points_to_use_for_clustering}')
+
+        sigma_prev = clusterization_parameters['sigma']
+        beta_prev = clusterization_parameters['beta']
+        potentials_focal_prev = clusterization_parameters['potentials_focal']
+        clusters_variance = clusterization_parameters['variance']
+        delta_min = clusterization_parameters['delta_min']
+        focals_current = clusterization_parameters['focals']
+
+        t = x.shape[0]
+
+        if membership_function == 'gaussian':
+            sigma_new, beta_new, focals_new, potentials_focal_new = \
+                update_antecedent_part(sigma_prev,
+                                       beta_prev,
+                                       clusters_variance,
+                                       focals_current,
+                                       potentials_focal_prev,
+                                       x_prev=x.iloc[-2],
+                                       x_new=x.iloc[-1],
+                                       t=t,
+                                       delta_min=delta_min,
+                                       )
+
+            parameters_new = {
+                'centers': focals_new,
+                'variance': clusters_variance
+            }
+
+            n_clusters_new = len(focals_new)
+            cov_matrices = [diag([clusters_variance] * n, k=0) for _ in range(n_clusters_new)]
+
+            membership_degrees = calc_gaussian_membership_degrees(x.iloc[-1], focals_new, cov_matrices)
+
+            clusterization_parameters_new = clusterization_parameters.copy()
+            clusterization_parameters_new.update(
+                {
+                    'sigma': sigma_new,
+                    'beta': beta_new,
+                    'focals': focals_new,
+                    'potentials_focal': potentials_focal_new
+                }
+            )
+
+            # resulting dict
+            result = {
+                'parameters': parameters_new,
+                'membership': membership_degrees,
+                'clusterization_parameters': clusterization_parameters_new
+            }
+        else:
+            raise ValueError(f'Membership function of form {membership_function} is not supported for '
+                             f'clustering method {method}')
+    elif method == 'eClustering':
+        raise NotImplementedError('eClustering antecedent learning is not implemented')
     else:
-        raise Exception('Clustering method name is wrong or method is not implemented')
+        raise ValueError(f'Clustering method name {method} is wrong or method is not implemented; '
+                         f'should be one of {CLUSTERING_METHODS}')
 
     if normalize:
         membership_degrees = membership_degrees / membership_degrees.sum()
