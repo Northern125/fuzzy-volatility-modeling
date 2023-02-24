@@ -2,10 +2,12 @@ import logging
 from typing import Union
 
 from pandas import Series, DataFrame, concat
-from numpy import array
+from numpy import array, diag
 from scipy.optimize import least_squares, differential_evolution
 
-from clusterization import cluster_data
+from clusterization import cluster_data, calc_gaussian_membership_degrees
+from clusterization.ets import update_antecedent_part as ets_update_antecedent_part
+from clusterization.all_methods import CLUSTERING_METHODS
 from local_models import calc_cond_var_fuzzy
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
@@ -18,6 +20,7 @@ class FuzzyVolatilityModel:
     def __init__(self,
                  train_data: Series = None,
                  clusterization_method: str = 'gaussian',
+                 membership_function: str = 'gaussian',
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
                  local_method_parameters: dict = None,
@@ -29,7 +32,9 @@ class FuzzyVolatilityModel:
                  n_points_fitting: int = None,
                  first_h: Series = None,
                  optimization: str = 'ls',
-                 optimization_parameters: dict = None):
+                 optimization_parameters: dict = None,
+                 clustered_space_dim: int = None
+                 ):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
@@ -42,6 +47,7 @@ class FuzzyVolatilityModel:
         # antecedent metaparameters
         self.clusterization_method = clusterization_method
         self.clusterization_parameters = clusterization_parameters
+        self.membership_function = membership_function
 
         # consequent metaparameters
         self.local_method = local_method
@@ -68,7 +74,12 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
+
+        self._n_clusters_hist = []
+        self.n_clusters_hist = DataFrame(dtype=float).copy()
         self.n_clusters = None
+
+        self.clustered_space_dim = clustered_space_dim
 
         if type(data_to_cluster) is not str and data_to_cluster is not None:
             self.data_to_cluster = data_to_cluster.copy()
@@ -87,6 +98,37 @@ class FuzzyVolatilityModel:
         self.cluster_sets_conjunction = cluster_sets_conjunction
         self.n_cluster_sets = n_cluster_sets
         self.normalize = normalize
+
+        # clustering algorithm
+        if self.clusterization_method == 'gaussian' or self.clusterization_method == 'trapezoidal':
+            self.cluster = self._cluster
+        elif self.clusterization_method == 'eTS':
+            self.cluster = self._cluster_ets()
+
+            if self.membership_function != 'gaussian':
+                raise ValueError(f'Membership function of form {self.membership_function} is not supported for '
+                                 f'clustering method {self.clusterization_method}')
+
+            if self.data_to_cluster is not None:
+                self.clustered_space_dim = self.data_to_cluster.shape[1]
+            elif self.clustered_space_dim is not None:
+                pass
+            else:
+                self.clustered_space_dim = self.p + self.q
+                self.logger.warning(f'Both `data_to_cluster` and `clustered_space_dim` are None; '
+                                    f'`clustered_space_dim` is set to be equal to `p + q`')
+
+            # initializing `clusters_parameters_current`
+            self.clusters_parameters_current = self.clusterization_parameters
+
+            clusters_variance = self.clusterization_parameters['variance']
+            self.cov_matrix = diag([clusters_variance] * self.clustered_space_dim, k=0)
+        elif self.clusterization_method == 'eClustering':
+            raise NotImplementedError('eClustering antecedent learning is not implemented')
+        else:
+            raise ValueError(f'Clustering method name {self.clusterization_method} '
+                             f'is wrong or method is not implemented; '
+                             f'should be one of {CLUSTERING_METHODS}')
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -163,7 +205,7 @@ class FuzzyVolatilityModel:
     def _calc_rss(self, _parameters):
         return (self._calc_residuals(_parameters) ** 2).sum()
 
-    def cluster(self):
+    def _cluster(self):
         self.logger.debug('Starting clusterization')
 
         clusterization_result = \
@@ -183,6 +225,57 @@ class FuzzyVolatilityModel:
         self.logger.debug(f'Clusterization completed\n'
                           f'Estimated parameters: {self.clusters_parameters_current}\n'
                           f'Membership degrees:\n{self.membership_degrees_current}')
+
+        self._clusters_parameters_hist.append(self.clusters_parameters_current)
+        self._membership_degrees_hist.append(self.membership_degrees_current)
+        self._n_clusters_hist.append(self.n_clusters)
+
+    def _cluster_ets(self):
+        if type(self.data_to_cluster) is not DataFrame:
+            raise ValueError(f'`x` should be a pandas.DataFrame; got `type(x)` = {type(self.data_to_cluster)}')
+        if self.n_last_points_to_use_for_clustering is not None:
+            raise ValueError(f'For clustering method {self.clusterization_method} '
+                             f'`n_last_points_to_use_for_clustering` should be None; '
+                             f'got {self.n_last_points_to_use_for_clustering}')
+
+        sigma_prev = self.clusters_parameters_current['sigma']
+        beta_prev = self.clusters_parameters_current['beta']
+        potentials_focal_prev = self.clusters_parameters_current['potentials_focal']
+        delta_min = self.clusters_parameters_current['delta_min']
+        focals_current = self.clusters_parameters_current['centers']
+
+        t = self.data_to_cluster.shape[0]
+
+        sigma_new, beta_new, focals_new, potentials_focal_new = \
+            ets_update_antecedent_part(sigma_prev,
+                                       beta_prev,
+                                       self.cov_matrix[0, 0],
+                                       focals_current,
+                                       potentials_focal_prev,
+                                       x_prev=self.data_to_cluster.iloc[-2],
+                                       x_new=self.data_to_cluster.iloc[-1],
+                                       t=t,
+                                       delta_min=delta_min,
+                                       )
+
+        parameters_new = {
+            'centers': focals_new,
+            'sigma': sigma_new,
+            'beta': beta_new,
+            'focals': focals_new,
+            'potentials_focal': potentials_focal_new
+        }
+
+        self.clusters_parameters_current.update(parameters_new)
+
+        self.n_clusters = len(focals_new)
+        cov_matrices = [self.cov_matrix for _ in range(self.n_clusters)]
+
+        self.membership_degrees = calc_gaussian_membership_degrees(
+            self.data_to_cluster.iloc[-1],
+            focals_new,
+            cov_matrices
+        )
 
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
