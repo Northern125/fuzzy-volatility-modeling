@@ -103,7 +103,7 @@ class FuzzyVolatilityModel:
         if self.clusterization_method == 'gaussian' or self.clusterization_method == 'trapezoidal':
             self.cluster = self._cluster
         elif self.clusterization_method == 'eTS':
-            self.cluster = self._cluster_ets()
+            self.cluster = self._cluster_ets
 
             if self.membership_function != 'gaussian':
                 raise ValueError(f'Membership function of form {self.membership_function} is not supported for '
