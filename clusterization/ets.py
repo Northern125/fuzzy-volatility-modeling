@@ -65,3 +65,11 @@ def update_antecedent_part(sigma_prev: float,
             potentials_focal_new = array(potentials_focal_new)
 
     return sigma_current, beta_current, focals_new, potentials_focal_new
+
+
+def calc_sigma(x: array) -> float:
+    return x[:-1, :].sum()
+
+
+def calc_beta(x: array) -> array:
+    return x[:-1, :].sum(axis=0)
