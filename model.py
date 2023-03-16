@@ -300,7 +300,8 @@ class FuzzyVolatilityModel:
                                           self.consequent_parameters_ini['beta'])
 
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
-        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds)
+        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds,
+                                  **self.optimization_parameters)
         self._ls_results_hist.append(ls_result)
 
         parameters = ls_result.x
