@@ -119,7 +119,7 @@ class FuzzyVolatilityModel:
                                     f'`clustered_space_dim` is set to be equal to `p + q`')
 
             # initializing `clusters_parameters_current`
-            self.clusters_parameters_current = self.clusterization_parameters
+            self.clusters_parameters_current = self.clusterization_parameters.copy()
 
             clusters_variance = self.clusterization_parameters['variance']
             self.cov_matrix = diag([clusters_variance] * self.clustered_space_dim, k=0)
@@ -252,8 +252,8 @@ class FuzzyVolatilityModel:
                                        self.cov_matrix[0, 0],
                                        focals_current,
                                        potentials_focal_prev,
-                                       x_prev=self.data_to_cluster.iloc[-2],
-                                       x_new=self.data_to_cluster.iloc[-1],
+                                       x_prev=self.data_to_cluster.iloc[-2].values,
+                                       x_new=self.data_to_cluster.iloc[-1].values,
                                        t=t,
                                        delta_min=delta_min,
                                        )
@@ -279,6 +279,7 @@ class FuzzyVolatilityModel:
 
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
+        self._n_clusters_hist.append(self.n_clusters)
 
     def fit(self, train_data: Series = None, n_points: int = None):
         if train_data is not None:
