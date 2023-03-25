@@ -2,7 +2,7 @@ import logging
 from typing import Union
 
 from pandas import Series, DataFrame, concat
-from numpy import array, diag
+from numpy import array, diag, concatenate, arange, array_str, inf
 from scipy.optimize import least_squares, differential_evolution
 
 from clusterization import cluster_data, calc_gaussian_membership_degrees
@@ -157,6 +157,8 @@ class FuzzyVolatilityModel:
         self._h_hist = []
 
         # optimization algorithm
+        self.optimization = optimization
+
         if optimization == 'ls':
             self._fit = self._fit_ls
         elif optimization == 'differential evolution':
@@ -268,10 +270,35 @@ class FuzzyVolatilityModel:
 
         self.clusters_parameters_current.update(parameters_new)
 
-        self.n_clusters = len(focals_new)
+        if self.n_clusters != len(focals_new):
+            self.n_clusters = len(focals_new)
+
+            _new_cluster_alpha_0_ini = self.consequent_parameters_ini['alpha_0'].mean()
+            self.consequent_parameters_ini['alpha_0'] = \
+                concatenate((self.consequent_parameters_ini['alpha_0'], [_new_cluster_alpha_0_ini])).copy()
+
+            _new_cluster_alpha_ini = self.consequent_parameters_ini['alpha'].mean(axis=1)
+            self.consequent_parameters_ini['alpha'] = \
+                concatenate((self.consequent_parameters_ini['alpha'], array([_new_cluster_alpha_ini]).T), axis=1).copy()
+
+            _new_cluster_beta_ini = self.consequent_parameters_ini['beta'].mean(axis=1)
+            self.consequent_parameters_ini['beta'] = \
+                concatenate((self.consequent_parameters_ini['beta'], array([_new_cluster_beta_ini]).T), axis=1).copy()
+
+            if self.optimization == 'ls':
+                self.bounds = self._add_bound(self.bounds, self.n_clusters)
+            elif self.optimization == 'differential evolution':
+                self.bounds = self._add_bound(self.bounds.T, self.n_clusters).T.copy()
+            else:
+                raise NotImplementedError(f'bounds recalculation for optimization of type {self.optimization} '
+                                          f'is not implemented')
+
+            bounds_str = array_str(self.bounds, max_line_width=inf).replace('\n', '')
+            self.logger.debug(f"""new bounds = {bounds_str}""")
+
         cov_matrices = [self.cov_matrix for _ in range(self.n_clusters)]
 
-        self.membership_degrees = calc_gaussian_membership_degrees(
+        self.membership_degrees_current = calc_gaussian_membership_degrees(
             self.data_to_cluster.iloc[-1],
             focals_new,
             cov_matrices
@@ -280,6 +307,30 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
         self._n_clusters_hist.append(self.n_clusters)
+
+    @staticmethod
+    def _add_bound(bounds: Union[array, tuple],
+                   n_clusters: int):
+        """
+
+        :param bounds: 2D array-like w/ 2 rows, first row representing lower bounds, and second row - upper bounds
+        :param n_clusters: int, number of clusters
+        :return:
+        """
+
+        bounds_new = array(
+            [
+                array(
+                    [
+                        list(_bounds_ul[i:i + n_clusters - 1]) + [_bounds_ul[i + n_clusters - 2]]
+                        for i in arange(0, len(_bounds_ul), n_clusters - 1)
+                    ]
+                ).flatten()
+                for _bounds_ul in bounds
+            ]
+        ).copy()
+
+        return bounds_new
 
     def fit(self, train_data: Series = None, n_points: int = None):
         if train_data is not None:
@@ -312,7 +363,7 @@ class FuzzyVolatilityModel:
         self.alpha_0, self.alpha, self.beta = \
             unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
-        self.consequent_parameters_ini = self._parameters_hist[-1]
+        self.consequent_parameters_ini = self._parameters_hist[-1].copy()
 
         self.logger.debug('Fitting is completed')
 
@@ -332,7 +383,7 @@ class FuzzyVolatilityModel:
             unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
 
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
-        self.consequent_parameters_ini = self._parameters_hist[-1]
+        self.consequent_parameters_ini = self._parameters_hist[-1].copy()
 
         self.logger.debug('Fitting is completed')
 
