@@ -441,6 +441,8 @@ class FuzzyVolatilityModel:
 
         # imitating live daily algorithm work
         for date in test_data.index:
+            self.logger.debug(f'feed_daily_data: new iteration @ {date}')
+
             observation = test_data.loc[date]
             data_to_cluster_point = data_to_cluster.loc[date]
             self._push(observation, date, data_to_cluster_point)
