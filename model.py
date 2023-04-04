@@ -475,3 +475,6 @@ class FuzzyVolatilityModel:
                                          for _ls_res in self._ls_results_hist]).copy()
 
         return ls_res
+
+    def show_antecedent_hist(self):
+        return DataFrame.from_records(self._clusters_parameters_hist).copy()
