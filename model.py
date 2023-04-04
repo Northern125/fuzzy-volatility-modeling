@@ -219,7 +219,7 @@ class FuzzyVolatilityModel:
                          n_sets=self.n_cluster_sets,
                          normalize=self.normalize)
 
-        self.clusters_parameters_current = clusterization_result['parameters']
+        self.clusters_parameters_current = clusterization_result['parameters'].copy()
         self.n_clusters = self.clusters_parameters_current['n_clusters']
 
         self.membership_degrees_current = clusterization_result['membership']
@@ -265,9 +265,11 @@ class FuzzyVolatilityModel:
             'sigma': sigma_new,
             'beta': beta_new,
             'focals': focals_new,
-            'potentials_focal': potentials_focal_new
+            'potentials_focal': potentials_focal_new,
+            'n_clusters': len(focals_new)
         }
 
+        self.clusters_parameters_current = self.clusters_parameters_current.copy()
         self.clusters_parameters_current.update(parameters_new)
 
         if self.n_clusters != len(focals_new):
