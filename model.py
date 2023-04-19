@@ -4,11 +4,13 @@ from typing import Union
 from pandas import Series, DataFrame, concat
 from numpy import array, diag, concatenate, arange, array_str, inf
 from scipy.optimize import least_squares, differential_evolution
+from IPython.core.debugger import set_trace
 
 from clusterization import cluster_data, calc_gaussian_membership_degrees
 from clusterization.ets import update_antecedent_part as ets_update_antecedent_part
 from clusterization.all_methods import CLUSTERING_METHODS
 from local_models import calc_cond_var_fuzzy
+from local_models.garch import PAST_H_TYPE_DEFAULT, PAST_H_TYPES
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
 module_logger = logging.getLogger(__name__)
@@ -33,7 +35,8 @@ class FuzzyVolatilityModel:
                  first_h: Series = None,
                  optimization: str = 'ls',
                  optimization_parameters: dict = None,
-                 clustered_space_dim: int = None
+                 clustered_space_dim: int = None,
+                 past_h_type: str = PAST_H_TYPE_DEFAULT
                  ):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
@@ -60,9 +63,17 @@ class FuzzyVolatilityModel:
         self.p = self.local_method_parameters['p']
         self.q = self.local_method_parameters['q']
         self.starting_index = max(self.p, self.q)
+        self.past_h_type = past_h_type
         if first_h is None:
-            self.first_h_current = self.train_data[:self.starting_index] ** 2
+            if self.past_h_type == 'aggregated':
+                self._first_h_1d_current = self.train_data[:self.starting_index] ** 2
+                self.first_h_current = self._first_h_1d_current.copy()
+            elif self.past_h_type == 'rule-wise':
+                raise ValueError(f"""If `past_h_type == 'rule-wise'`, `first_h` should be provided`""")
+            else:
+                raise ValueError(f'`past_h_type` should be one of {PAST_H_TYPES}; got {self.past_h_type}')
         else:
+            self._first_h_1d_current = None
             self.first_h_current = first_h.copy()
 
         if self.n_points_fitting is not None and self.n_points_fitting > len(self.train_data):
@@ -145,6 +156,8 @@ class FuzzyVolatilityModel:
         self.hist_output = Series(dtype=float).copy()
         self.current_output = None
 
+        self._hist_output_fuzzy: list = []
+
         # consequent parameters
         self.alpha_0 = None
         self.alpha = None
@@ -155,6 +168,9 @@ class FuzzyVolatilityModel:
         # GARCH variables
         self.h = None
         self._h_hist = []
+
+        self.h_fuzzy: array = None
+        self._h_fuzzy_hist: list = []
 
         # optimization algorithm
         self.optimization = optimization
@@ -196,10 +212,10 @@ class FuzzyVolatilityModel:
         alpha_0, alpha, beta = unpack_1d_parameters(_parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
 
         h = calc_cond_var_fuzzy(alpha_0, alpha, beta, self.train_data[self._fitting_slice] ** 2, self.first_h_current,
-                                weights=self.membership_degrees_current)
+                                weights=self.membership_degrees_current, past_h_type=self.past_h_type)
 
         residuals = self.train_data[self._fitting_slice][self.starting_index:] ** 2 - h[self.starting_index:-1]
-        self.logger.debug(f'residuals =\n{residuals}')
+        self.logger.debug(f'residuals = {residuals.tolist()}')
         self.logger.debug(f'RSS = {(residuals ** 2).sum()}')
 
         return residuals
@@ -399,14 +415,19 @@ class FuzzyVolatilityModel:
         self._fitting_slice = _fitting_slice_ini
 
     def _forecast(self):
-        # first_h = array(self.local_method_parameters['first_h'])
-        self.h = calc_cond_var_fuzzy(self.alpha_0, self.alpha, self.beta,
-                                     self.train_data[self._fitting_slice] ** 2, self.first_h_current,
-                                     weights=self.membership_degrees_current)
+        self.h_fuzzy, self.h = calc_cond_var_fuzzy(self.alpha_0, self.alpha, self.beta,
+                                                   self.train_data[self._fitting_slice] ** 2, self.first_h_current,
+                                                   return_fuzzy=True,
+                                                   weights=self.membership_degrees_current,
+                                                   past_h_type=self.past_h_type)
 
         self._h_hist.append(self.h)
         self.current_output = self.h[-1]
         self._hist_output.append(self.current_output)
+
+        if self.past_h_type == 'rule-wise':
+            self._h_fuzzy_hist.append(self.h_fuzzy)
+            self._hist_output_fuzzy.append(self.h_fuzzy[-1, :])
 
     def _push(self, observation: float, observation_date, data_to_cluster_point):
         self.train_data.loc[observation_date] = observation
@@ -415,10 +436,19 @@ class FuzzyVolatilityModel:
         elif self.data_to_cluster != 'train':
             raise ValueError("""`data_to_cluster` should be either a string 'train' or not a string""")
 
-        self.first_h_current = self.train_data[self._fitting_slice][:self.starting_index] ** 2
+        self._first_h_1d_current = self.train_data[self._fitting_slice][:self.starting_index] ** 2
 
         self.cluster()
+        self._set_first_h()
         self._fit()
+
+    def _set_first_h(self):
+        if self.past_h_type == 'aggregated':
+            self.first_h_current = self._first_h_1d_current.copy()
+        elif self.past_h_type == 'rule-wise':
+            self.first_h_current = array([self._first_h_1d_current.copy() for _ in range(self.n_clusters)]).T.copy()
+        else:
+            raise ValueError(f'`past_h_type` should be one of {PAST_H_TYPES}; got {self.past_h_type}')
 
     def feed_daily_data(self, test_data: Series, data_to_cluster=None, n_points: int = None):
         if self.current_output is None:

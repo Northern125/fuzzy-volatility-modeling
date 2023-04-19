@@ -1,6 +1,9 @@
 from rules_related import combine_rules_outputs
-from numpy import array
+from numpy import array, apply_along_axis
 import logging
+
+PAST_H_TYPE_DEFAULT = 'aggregated'
+PAST_H_TYPES = (PAST_H_TYPE_DEFAULT, 'rule-wise')
 
 
 def calc_ht(alpha_0, alpha, beta, y_squared, h):
@@ -8,23 +11,64 @@ def calc_ht(alpha_0, alpha, beta, y_squared, h):
     return res
 
 
-def calc_fuzzy_ht(alpha_0, alpha, beta, y_squared, h, weights):
-    n_clusters = weights.shape[0]
+def calc_fuzzy_ht_aggregated(alpha_0, alpha, beta, y_squared, h,
+                             weights: array,
+                             ) -> array:
+    """
+
+    :param alpha_0:
+    :param alpha:
+    :param beta:
+    :param y_squared:
+    :param h: 1D or 2D array-like, depending on `past_h_type`. The past conditional variance values `h_{t-j}`
+    :param weights:
+    :param past_h_type: str. Type of past `h` values. If 'aggregated': `h` should be 1 dimensional and contain past
+    aggregated h values. If 'rule-wise': `h` should be 2 dimensional and contain rule-wise `h_{t-j}^(k)` values
+    :return: 1D array. Output of each cluster
+    """
+    h = array(h).copy()
+
+    n_clusters: int = len(weights)
 
     outputs = [
         calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h)
         for j in range(n_clusters)
     ]
-    outputs = array(outputs)
+    outputs = array(outputs).copy()
 
-    result = combine_rules_outputs(outputs, weights)
+    output = combine_rules_outputs(outputs, weights).copy()
 
-    return result
+    return output
+
+
+def calc_fuzzy_ht_rule_wise(alpha_0, alpha, beta, y_squared, h,
+                            n_clusters: int):
+    """
+
+    :param alpha_0:
+    :param alpha:
+    :param beta:
+    :param y_squared:
+    :param h:
+    :param n_clusters:
+    :param past_h_type:
+    :return:
+    """
+    h = array(h).copy()
+
+    outputs = [
+        calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h[:, j])
+        for j in range(n_clusters)
+    ]
+    outputs = array(outputs).copy()
+
+    return outputs
 
 
 def _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
-                   calc_ht_function: callable = calc_ht, **kwargs) -> array:
-    logger = logging.getLogger('calc_cond_var_fuzzy')
+                   calc_ht_function: callable = calc_ht,
+                   **kwargs) -> array:
+    logger = logging.getLogger('_calc_cond_var')
 
     q = len(alpha)
     p = len(beta)
@@ -50,7 +94,7 @@ def _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
         logger.debug(f'New iteration; i = {i}: h_t = {h_t}, y_slc = {y_slc}, h_slc = {h_slc}, '
                      f'h[h_slc] = {h[h_slc]}, y_squared[y_slc] =\n{y_squared[y_slc]}')
 
-    h = array(h)
+    h = array(h).copy()
 
     return h
 
@@ -60,7 +104,32 @@ def calc_cond_var_vanilla(alpha_0, alpha, beta, y_squared, first_h) -> array:
                           calc_ht_function=calc_ht)
 
 
-def calc_cond_var_fuzzy(alpha_0, alpha, beta, y_squared, first_h, weights) -> array:
-    return _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
-                          weights=weights,
-                          calc_ht_function=calc_fuzzy_ht)
+def calc_cond_var_fuzzy(alpha_0, alpha, beta, y_squared, first_h, weights,
+                        return_fuzzy: bool = False,
+                        past_h_type: str = PAST_H_TYPE_DEFAULT) -> array:
+    logger = logging.getLogger('calc_cond_var_fuzzy')
+
+    n_clusters: int = weights.shape[0]
+
+    if past_h_type == 'aggregated':
+        fuzzy_cond_var = _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
+                                        weights=weights,
+                                        calc_ht_function=calc_fuzzy_ht_aggregated)
+        cond_var_combined = fuzzy_cond_var.copy()
+    elif past_h_type == 'rule-wise':
+        fuzzy_cond_var = _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
+                                        n_clusters=n_clusters,
+                                        calc_ht_function=calc_fuzzy_ht_rule_wise)
+        cond_var_combined = apply_along_axis(combine_rules_outputs,
+                                             axis=1,
+                                             arr=fuzzy_cond_var,
+                                             weights=weights)
+    else:
+        raise ValueError(f'`past_h_type` should be one of {PAST_H_TYPES}; got {past_h_type}')
+
+    logger.debug(f'fuzzy_cond_var = {fuzzy_cond_var.tolist()}')
+
+    if return_fuzzy:
+        return fuzzy_cond_var, cond_var_combined
+    else:
+        return cond_var_combined
