@@ -2,10 +2,12 @@ import logging
 from typing import Union
 
 from pandas import Series, DataFrame, concat
-from numpy import array
+from numpy import array, diag, concatenate, arange, array_str, inf
 from scipy.optimize import least_squares, differential_evolution
 
-from clusterization import cluster_data
+from clusterization import cluster_data, calc_gaussian_membership_degrees
+from clusterization.ets import update_antecedent_part as ets_update_antecedent_part
+from clusterization.all_methods import CLUSTERING_METHODS
 from local_models import calc_cond_var_fuzzy
 from auxiliary import unpack_1d_parameters, pack_1d_parameters
 
@@ -18,6 +20,7 @@ class FuzzyVolatilityModel:
     def __init__(self,
                  train_data: Series = None,
                  clusterization_method: str = 'gaussian',
+                 membership_function: str = 'gaussian',
                  clusterization_parameters: dict = None,
                  local_method: str = 'garch',
                  local_method_parameters: dict = None,
@@ -29,7 +32,9 @@ class FuzzyVolatilityModel:
                  n_points_fitting: int = None,
                  first_h: Series = None,
                  optimization: str = 'ls',
-                 optimization_parameters=None):
+                 optimization_parameters: dict = None,
+                 clustered_space_dim: int = None
+                 ):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
 
@@ -42,6 +47,7 @@ class FuzzyVolatilityModel:
         # antecedent metaparameters
         self.clusterization_method = clusterization_method
         self.clusterization_parameters = clusterization_parameters
+        self.membership_function = membership_function
 
         # consequent metaparameters
         self.local_method = local_method
@@ -68,7 +74,12 @@ class FuzzyVolatilityModel:
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
         self.clusters_parameters_current = None
+
+        self._n_clusters_hist = []
+        self.n_clusters_hist = DataFrame(dtype=float).copy()
         self.n_clusters = None
+
+        self.clustered_space_dim = clustered_space_dim
 
         if type(data_to_cluster) is not str and data_to_cluster is not None:
             self.data_to_cluster = data_to_cluster.copy()
@@ -87,6 +98,37 @@ class FuzzyVolatilityModel:
         self.cluster_sets_conjunction = cluster_sets_conjunction
         self.n_cluster_sets = n_cluster_sets
         self.normalize = normalize
+
+        # clustering algorithm
+        if self.clusterization_method == 'gaussian' or self.clusterization_method == 'trapezoidal':
+            self.cluster = self._cluster
+        elif self.clusterization_method == 'eTS':
+            self.cluster = self._cluster_ets
+
+            if self.membership_function != 'gaussian':
+                raise ValueError(f'Membership function of form {self.membership_function} is not supported for '
+                                 f'clustering method {self.clusterization_method}')
+
+            if self.data_to_cluster is not None:
+                self.clustered_space_dim = self.data_to_cluster.shape[1]
+            elif self.clustered_space_dim is not None:
+                pass
+            else:
+                self.clustered_space_dim = self.p + self.q
+                self.logger.warning(f'Both `data_to_cluster` and `clustered_space_dim` are None; '
+                                    f'`clustered_space_dim` is set to be equal to `p + q`')
+
+            # initializing `clusters_parameters_current`
+            self.clusters_parameters_current = self.clusterization_parameters.copy()
+
+            clusters_variance = self.clusterization_parameters['variance']
+            self.cov_matrix = diag([clusters_variance] * self.clustered_space_dim, k=0)
+        elif self.clusterization_method == 'eClustering':
+            raise NotImplementedError('eClustering antecedent learning is not implemented')
+        else:
+            raise ValueError(f'Clustering method name {self.clusterization_method} '
+                             f'is wrong or method is not implemented; '
+                             f'should be one of {CLUSTERING_METHODS}')
 
         # membership degrees
         self._membership_degrees_hist = []
@@ -115,6 +157,8 @@ class FuzzyVolatilityModel:
         self._h_hist = []
 
         # optimization algorithm
+        self.optimization = optimization
+
         if optimization == 'ls':
             self._fit = self._fit_ls
         elif optimization == 'differential evolution':
@@ -163,7 +207,7 @@ class FuzzyVolatilityModel:
     def _calc_rss(self, _parameters):
         return (self._calc_residuals(_parameters) ** 2).sum()
 
-    def cluster(self):
+    def _cluster(self):
         self.logger.debug('Starting clusterization')
 
         clusterization_result = \
@@ -175,7 +219,7 @@ class FuzzyVolatilityModel:
                          n_sets=self.n_cluster_sets,
                          normalize=self.normalize)
 
-        self.clusters_parameters_current = clusterization_result['parameters']
+        self.clusters_parameters_current = clusterization_result['parameters'].copy()
         self.n_clusters = self.clusters_parameters_current['n_clusters']
 
         self.membership_degrees_current = clusterization_result['membership']
@@ -186,6 +230,109 @@ class FuzzyVolatilityModel:
 
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
         self._membership_degrees_hist.append(self.membership_degrees_current)
+        self._n_clusters_hist.append(self.n_clusters)
+
+    def _cluster_ets(self):
+        if type(self.data_to_cluster) is not DataFrame:
+            raise ValueError(f'`x` should be a pandas.DataFrame; got `type(x)` = {type(self.data_to_cluster)}')
+        if self.n_last_points_to_use_for_clustering is not None:
+            raise ValueError(f'For clustering method {self.clusterization_method} '
+                             f'`n_last_points_to_use_for_clustering` should be None; '
+                             f'got {self.n_last_points_to_use_for_clustering}')
+
+        sigma_prev = self.clusters_parameters_current['sigma']
+        beta_prev = self.clusters_parameters_current['beta']
+        potentials_focal_prev = self.clusters_parameters_current['potentials_focal']
+        delta_min = self.clusters_parameters_current['delta_min']
+        focals_current = self.clusters_parameters_current['centers']
+
+        t = self.data_to_cluster.shape[0]
+
+        sigma_new, beta_new, focals_new, potentials_focal_new = \
+            ets_update_antecedent_part(sigma_prev,
+                                       beta_prev,
+                                       self.cov_matrix[0, 0],
+                                       focals_current,
+                                       potentials_focal_prev,
+                                       x_prev=self.data_to_cluster.iloc[-2].values,
+                                       x_new=self.data_to_cluster.iloc[-1].values,
+                                       t=t,
+                                       delta_min=delta_min,
+                                       )
+
+        parameters_new = {
+            'centers': focals_new,
+            'sigma': sigma_new,
+            'beta': beta_new,
+            'focals': focals_new,
+            'potentials_focal': potentials_focal_new,
+            'n_clusters': len(focals_new)
+        }
+
+        self.clusters_parameters_current = self.clusters_parameters_current.copy()
+        self.clusters_parameters_current.update(parameters_new)
+
+        if self.n_clusters != len(focals_new):
+            self.n_clusters = len(focals_new)
+
+            _new_cluster_alpha_0_ini = self.consequent_parameters_ini['alpha_0'].mean()
+            self.consequent_parameters_ini['alpha_0'] = \
+                concatenate((self.consequent_parameters_ini['alpha_0'], [_new_cluster_alpha_0_ini])).copy()
+
+            _new_cluster_alpha_ini = self.consequent_parameters_ini['alpha'].mean(axis=1)
+            self.consequent_parameters_ini['alpha'] = \
+                concatenate((self.consequent_parameters_ini['alpha'], array([_new_cluster_alpha_ini]).T), axis=1).copy()
+
+            _new_cluster_beta_ini = self.consequent_parameters_ini['beta'].mean(axis=1)
+            self.consequent_parameters_ini['beta'] = \
+                concatenate((self.consequent_parameters_ini['beta'], array([_new_cluster_beta_ini]).T), axis=1).copy()
+
+            if self.optimization == 'ls':
+                self.bounds = self._add_bound(self.bounds, self.n_clusters)
+            elif self.optimization == 'differential evolution':
+                self.bounds = self._add_bound(self.bounds.T, self.n_clusters).T.copy()
+            else:
+                raise NotImplementedError(f'bounds recalculation for optimization of type {self.optimization} '
+                                          f'is not implemented')
+
+            bounds_str = array_str(self.bounds, max_line_width=inf).replace('\n', '')
+            self.logger.debug(f"""new bounds = {bounds_str}""")
+
+        cov_matrices = [self.cov_matrix for _ in range(self.n_clusters)]
+
+        self.membership_degrees_current = calc_gaussian_membership_degrees(
+            self.data_to_cluster.iloc[-1],
+            focals_new,
+            cov_matrices
+        )
+
+        self._clusters_parameters_hist.append(self.clusters_parameters_current)
+        self._membership_degrees_hist.append(self.membership_degrees_current)
+        self._n_clusters_hist.append(self.n_clusters)
+
+    @staticmethod
+    def _add_bound(bounds: Union[array, tuple],
+                   n_clusters: int):
+        """
+
+        :param bounds: 2D array-like w/ 2 rows, first row representing lower bounds, and second row - upper bounds
+        :param n_clusters: int, number of clusters
+        :return:
+        """
+
+        bounds_new = array(
+            [
+                array(
+                    [
+                        list(_bounds_ul[i:i + n_clusters - 1]) + [_bounds_ul[i + n_clusters - 2]]
+                        for i in arange(0, len(_bounds_ul), n_clusters - 1)
+                    ]
+                ).flatten()
+                for _bounds_ul in bounds
+            ]
+        ).copy()
+
+        return bounds_new
 
     def fit(self, train_data: Series = None, n_points: int = None):
         if train_data is not None:
@@ -207,7 +354,8 @@ class FuzzyVolatilityModel:
                                           self.consequent_parameters_ini['beta'])
 
         self.logger.debug(f'Starting least squares estimation of parameters; `parameters_0`: {parameters_0}')
-        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds)
+        ls_result = least_squares(self._calc_residuals, parameters_0, bounds=self.bounds,
+                                  **self.optimization_parameters)
         self._ls_results_hist.append(ls_result)
 
         parameters = ls_result.x
@@ -217,7 +365,7 @@ class FuzzyVolatilityModel:
         self.alpha_0, self.alpha, self.beta = \
             unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
-        self.consequent_parameters_ini = self._parameters_hist[-1]
+        self.consequent_parameters_ini = self._parameters_hist[-1].copy()
 
         self.logger.debug('Fitting is completed')
 
@@ -237,7 +385,7 @@ class FuzzyVolatilityModel:
             unpack_1d_parameters(parameters, p=self.p, q=self.q, n_clusters=self.n_clusters)
 
         self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
-        self.consequent_parameters_ini = self._parameters_hist[-1]
+        self.consequent_parameters_ini = self._parameters_hist[-1].copy()
 
         self.logger.debug('Fitting is completed')
 
@@ -295,6 +443,8 @@ class FuzzyVolatilityModel:
 
         # imitating live daily algorithm work
         for date in test_data.index:
+            self.logger.debug(f'feed_daily_data: new iteration @ {date}')
+
             observation = test_data.loc[date]
             data_to_cluster_point = data_to_cluster.loc[date]
             self._push(observation, date, data_to_cluster_point)
@@ -327,3 +477,6 @@ class FuzzyVolatilityModel:
                                          for _ls_res in self._ls_results_hist]).copy()
 
         return ls_res
+
+    def show_antecedent_hist(self):
+        return DataFrame.from_records(self._clusters_parameters_hist).copy()
