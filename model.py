@@ -290,6 +290,7 @@ class FuzzyVolatilityModel:
 
         if self.n_clusters != len(focals_new):
             self.n_clusters = len(focals_new)
+            self.logger.debug(f'new # of clusters: {self.n_clusters}')
 
             _new_cluster_alpha_0_ini = self.consequent_parameters_ini['alpha_0'].mean()
             self.consequent_parameters_ini['alpha_0'] = \
