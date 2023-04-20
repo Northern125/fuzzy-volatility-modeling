@@ -7,6 +7,7 @@ def update_parameters(params_prev: array,
                       coeffs_prev: array
                       ) -> tuple[array, array]:
     """
+    Re-estimate the parameters of a linear model at time instant `t`.
     The equation is as follows: `y_{t + 1} = psi_t^T * theta_t`. At time point `t` we have `y_t`, `psi_{t-1}`,
     `theta_{t-1}`, `C_{t-1}` and we estimate `theta_t`.
     `psi_t` is a coefficients column vector
@@ -37,13 +38,15 @@ def ets_new_cluster_update_parameters(params_prev: array,
                                       omega: float
                                       ) -> tuple[array, array]:
     """
-
-    :param params_prev:
-    :param cov_prev:
-    :param: weights
-    :param n_params_in_a_rule
-    :param omega
-    :return:
+    Re-estimate parameters of a model (same model as in `update_parameters()`) given that a new cluster is added.
+    This procedure is synced with the eTS model (the algorithm was proposed in Angelov, Filev (2004)).
+    For more details on the model and notations look `update_parameters()` docstring
+    :param params_prev: 1D numpy.array. `theta_{t-1}`
+    :param cov_prev: 2D numpy.array. `C{t-1}`
+    :param weights: 1D numpy.array. The weights of the fuzzy system at the previous time step `t - 1`
+    :param n_params_in_a_rule: int. The # of parameters in each rule
+    :param omega: float. `Omega`, a big number via which the new part of the covariance matrix is initialized
+    :return: tuple (`C_t`, `theta_t`)
     """
     weights = (weights / weights.sum()).copy()
 
