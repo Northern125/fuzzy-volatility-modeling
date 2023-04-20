@@ -1,7 +1,7 @@
 import unittest
 from numpy import array, diag
 
-from consequent_estimators.recursive_ls import ets_new_cluster_update_parameters
+from consequent_estimators.recursive_ls import _ets_new_cluster_re_estimate_parameters
 
 
 class TestRLSeTSUpdate(unittest.TestCase):
@@ -16,11 +16,11 @@ class TestRLSeTSUpdate(unittest.TestCase):
         n_params_in_a_rule = 3
         omega = 1e4
 
-        cov_new, params_new = ets_new_cluster_update_parameters(params_prev=params_prev,
-                                                                cov_prev=cov_prev,
-                                                                weights=weights,
-                                                                n_params_in_a_rule=n_params_in_a_rule,
-                                                                omega=omega)
+        cov_new, params_new = _ets_new_cluster_re_estimate_parameters(params_prev=params_prev,
+                                                                      cov_prev=cov_prev,
+                                                                      weights=weights,
+                                                                      n_params_in_a_rule=n_params_in_a_rule,
+                                                                      omega=omega)
 
         params_new_true = array([1, 2, 3, 4, 5, 6, 3.4, 4.4, 5.4])
         cov_new_true = array([

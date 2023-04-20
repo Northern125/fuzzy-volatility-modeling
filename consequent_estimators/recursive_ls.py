@@ -1,11 +1,11 @@
 from numpy import array, reshape, dot, concatenate, eye, block, zeros
 
 
-def update_parameters(params_prev: array,
-                      cov_prev: array,
-                      y_new: float,
-                      coeffs_prev: array
-                      ) -> tuple[array, array]:
+def _re_estimate_params_plain_rls(params_prev: array,
+                                  cov_prev: array,
+                                  y_new: float,
+                                  coeffs_prev: array
+                                  ) -> tuple[array, array]:
     """
     Re-estimate the parameters of a linear model at time instant `t`.
     The equation is as follows: `y_{t + 1} = psi_t^T * theta_t`. At time point `t` we have `y_t`, `psi_{t-1}`,
@@ -31,12 +31,12 @@ def update_parameters(params_prev: array,
     return cov_new, params_new
 
 
-def ets_new_cluster_update_parameters(params_prev: array,
-                                      cov_prev: array,
-                                      weights: array,
-                                      n_params_in_a_rule: int,
-                                      omega: float
-                                      ) -> tuple[array, array]:
+def _ets_new_cluster_re_estimate_parameters(params_prev: array,
+                                            cov_prev: array,
+                                            weights: array,
+                                            n_params_in_a_rule: int,
+                                            omega: float
+                                            ) -> tuple[array, array]:
     """
     Re-estimate parameters of a model (same model as in `update_parameters()`) given that a new cluster is added.
     This procedure is synced with the eTS model (the algorithm was proposed in Angelov, Filev (2004)).
