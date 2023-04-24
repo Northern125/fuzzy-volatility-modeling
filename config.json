@@ -11,6 +11,11 @@
       "n_clusters": 3,
       "centers": "",
       "cov_matrices": ""
+    },
+    "apf_settings":
+    {
+      "use_multiprocessing": "True",
+      "do_feeding": "False"
     }
   },
   "forecast_horizon": 1,
