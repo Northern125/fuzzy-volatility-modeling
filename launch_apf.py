@@ -151,9 +151,9 @@ if __name__ == '__main__':
             }
     }
 
-    _sample_desc = f"""{series_name}_{seas_or_wos}_{_train_start}_{_n_train}_{_n_test}_\
-                   {_n_retrain}_M={n_last_points_to_use_for_clustering}_\
-                   at_{_cur_time}.pkl"""
+    _sample_desc = f"""{series_name}_{seas_or_wos}_{_train_start}_{_n_train}_{_n_test}_{_n_retrain}_M={n_last_points_to_use_for_clustering}_at_{_cur_time}.pkl"""
     _file_name = f'{res_big_file_name}_{_sample_desc}_{_cur_time}.pkl'
     with open(RES_DIR / _file_name, 'wb') as file:
         pickle.dump(result_big, file)
+
+    print('Complete')
