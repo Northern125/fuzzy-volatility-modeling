@@ -27,8 +27,23 @@ logging.basicConfig(level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
 # some settings
-USE_MULTIPROCESSING_DEFAULT = config['defaults']['apf_settings']['use_multiprocessing']
-DO_FEEDING_DEFAULT = config['defaults']['apf_settings']['do_feeding']
+_use_mp_default = config['defaults']['apf_settings']['use_multiprocessing']
+if _use_mp_default.lower() == 'true':
+    USE_MULTIPROCESSING_DEFAULT = True
+elif _use_mp_default.lower() == 'false':
+    USE_MULTIPROCESSING_DEFAULT = False
+else:
+    raise ValueError("""Default value for use_mp should be either 'True' or 'False'; """
+                     f"""got '{_use_mp_default}'""")
+
+_do_feeding_default = config['defaults']['apf_settings']['do_feeding']
+if _do_feeding_default.lower() == 'true':
+    DO_FEEDING_DEFAULT = True
+elif _do_feeding_default.lower() == 'false':
+    DO_FEEDING_DEFAULT = False
+else:
+    raise ValueError("""Default value for do_feeding should be either 'True' or 'False'; """
+                     f"""got '{_do_feeding_default}'""")
 
 if __name__ == '__main__':
     # input
