@@ -47,8 +47,6 @@ else:
 
 if __name__ == '__main__':
     # input
-    series_name = input('series_name = ')
-
     _use_multiprocessing = input('use_multiprocessing = ')
     if _use_multiprocessing == '':
         print(f'OK, using default value {USE_MULTIPROCESSING_DEFAULT}')
@@ -92,6 +90,8 @@ if __name__ == '__main__':
     with open(AP_DIR / f'{metadata_file_name}', 'rb') as file:
         data = pickle.load(file)
 
+    _desc = data['_desc']
+    series_name = _desc['series_name']
     train = data['train']
     test = data['test']
     consequent_metaparams = data['consequent_metaparams']
@@ -158,16 +158,7 @@ if __name__ == '__main__':
         'local_method': local_method,
         'data_to_cluster_train': data_to_cluster_train,
         'data_to_cluster_test': data_to_cluster_test,
-        '_desc':
-            {
-                'series_name': series_name,
-                'train_start': _train_start,
-                'n_train': _n_train,
-                'n_test': _n_test,
-                'n_retrain': _n_retrain,
-                'M': n_last_points_to_use_for_clustering,
-                'is_seas': is_seas
-            }
+        '_desc': _desc
     }
 
     _sample_desc = f"""{series_name}_{seas_or_wos}_{_train_start}_{_n_train}_{_n_test}_{_n_retrain}_M={n_last_points_to_use_for_clustering}_at_{_cur_time}.pkl"""
