@@ -29,6 +29,8 @@ if __name__ == '__main__':
     # input
     _apf_result_file_name = input('APF result file name = ')
 
+    print('OK, starting the procedure')
+
     # loading data
     _files = [_apf_result_file_name]
     res_big = [pd.read_pickle(RES_DIR / _file) for _file in _files]
@@ -45,8 +47,12 @@ if __name__ == '__main__':
     test = res_big[0]['test'].copy()
     data_to_cluster_test = res_big[0]['data_to_cluster_test'].copy()
 
+    print('Finished loading data')
+
     # feeding
     fvm.feed_daily_data(test, data_to_cluster=data_to_cluster_test)
+
+    print('Finished feeding')
 
     # exporting
     _cur_time = str(pd.Timestamp.today()).replace(':', '-').replace(' ', '_')
@@ -57,3 +63,5 @@ if __name__ == '__main__':
     _file_name = f'{TESTED_MODEL_FILE_NAME}_{_sample_desc}_{_cur_time}.pkl'
     with open(RES_DIR / _file_name, 'wb') as file:
         pickle.dump(fvm, file)
+
+    print('Complete')

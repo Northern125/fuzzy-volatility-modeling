@@ -64,6 +64,8 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"""seas_or_wos should be either 'seas' or 'wos'; got '{seas_or_wos}'""")
 
+    print('OK, starting the procedure')
+
     # files names
     metadata_file_name = f'current_antecedent_fitting_metadata_{seas_or_wos}.pkl'
     summary_table_name = f'summary_table_{seas_or_wos}'
@@ -90,9 +92,9 @@ if __name__ == '__main__':
 
     n_cluster_sets = len(data['clusterization_method'])
 
-    # fitting
-    print('OK, starting the procedure')
+    print('Finished loading data')
 
+    # fitting
     result = fit_antecedent_params(train,
                                    test,
                                    consequent_metaparams=consequent_metaparams,
@@ -108,6 +110,8 @@ if __name__ == '__main__':
                                    other_fvm_parameters=other_fvm_parameters,
                                    use_multiprocessing=use_multiprocessing,
                                    do_feeding=do_feeding)
+
+    print('Finished fitting')
 
     _cur_time = str(pd.Timestamp.today()).replace(':', '-').replace(' ', '_')
 
