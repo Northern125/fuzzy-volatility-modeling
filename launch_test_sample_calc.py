@@ -12,6 +12,7 @@ RES_DIR = Path(config['files_folders']['research_results'])
 LOGS_DIR = Path(config['files_folders']['logs'])
 
 TESTED_MODEL_FILE_NAME = 'tested_model'
+BIG_FILE_NAME = 'tested_data'
 
 script_name = os.path.basename(__file__).split('.')[0]
 
@@ -61,7 +62,17 @@ if __name__ == '__main__':
     _seas_or_wos = 'seas' if _desc['is_seas'] else 'wos' if not _desc['is_seas'] else None
     _sample_desc = f"""{_desc['series_name']}_{_seas_or_wos}_{_desc['train_start']}_{_desc['n_train']}_{_desc['n_test']}_{_desc['n_retrain']}_M={_desc['M']}_at_{_cur_time}.pkl"""
     _file_name = f'{TESTED_MODEL_FILE_NAME}_{_sample_desc}_{_cur_time}.pkl'
-    with open(RES_DIR / _file_name, 'wb') as file:
-        pickle.dump(fvm, file)
+    with open(RES_DIR / _file_name, 'wb') as _file:
+        pickle.dump(fvm, _file)
+
+    data = {
+        'fvm': fvm,
+        '_desc': _desc
+    }
+
+    _big_file_name = f'{BIG_FILE_NAME}_{_sample_desc}_{_cur_time}.pkl'
+
+    with open(RES_DIR / _big_file_name, 'wb') as _file:
+        pickle.dump(data, _file)
 
     print('Complete')
