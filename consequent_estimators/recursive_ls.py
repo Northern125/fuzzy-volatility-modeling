@@ -74,7 +74,7 @@ def ets_new_cluster_re_estimate_parameters(params_prev: array,
 def initialize_rls_params(n_clusters: int,
                           n_params_in_a_rule: int,
                           omega: float
-                          ):
+                          ) -> tuple[array, array]:
     cov: array = eye(n_clusters * n_params_in_a_rule) * omega
     params: array = array([0 for _ in range(n_clusters * n_params_in_a_rule)])
 
