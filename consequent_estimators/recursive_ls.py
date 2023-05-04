@@ -23,7 +23,7 @@ def re_estimate_params_plain_rls(params_prev: array,
     coeffs_prev = reshape(coeffs_prev, (-1, 1)).copy()
 
     cov_new = \
-        cov_prev - (cov_prev @ params_prev @ params_prev.T @ cov_prev) / (1 + params_prev.T @ cov_prev @ params_prev)
+        cov_prev - (cov_prev @ coeffs_prev @ coeffs_prev.T @ cov_prev) / (1 + coeffs_prev.T @ cov_prev @ coeffs_prev)
 
     params_new = params_prev + cov_new @ coeffs_prev * (y_new - coeffs_prev.T @ params_prev)
     params_new = params_new.flatten().copy()
