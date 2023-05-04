@@ -22,7 +22,6 @@ def calc_fuzzy_ht_aggregated(alpha_0, alpha, beta, y_squared, h,
     :param y_squared:
     :param h: 1D or 2D array-like, depending on `past_h_type`. The past conditional variance values `h_{t-j}`
     :param weights:
-    :param past_h_type: str. Type of past `h` values. If 'aggregated': `h` should be 1 dimensional and contain past
     aggregated h values. If 'rule-wise': `h` should be 2 dimensional and contain rule-wise `h_{t-j}^(k)` values
     :return: 1D array. Output of each cluster
     """
@@ -51,7 +50,6 @@ def calc_fuzzy_ht_rule_wise(alpha_0, alpha, beta, y_squared, h,
     :param y_squared:
     :param h:
     :param n_clusters:
-    :param past_h_type:
     :return:
     """
     h = array(h).copy()
