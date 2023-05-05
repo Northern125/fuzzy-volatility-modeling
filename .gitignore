@@ -9,6 +9,7 @@ logs/
 /testing_model.ipynb
 seasonal_modeling/data_setting_old.ipynb
 *antecedent_fitting_metadata*.pkl
+saved_calculations_metaparams/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
