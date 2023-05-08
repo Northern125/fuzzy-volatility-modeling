@@ -25,6 +25,7 @@
     "processed": "processed_files",
     "research_results": "research_results",
     "antecedent_params_sets": "antecedent_params_sets",
-    "logs": "logs"
+    "logs": "logs",
+    "calculations_metaparams": "saved_calculations_metaparams"
   }
 }
