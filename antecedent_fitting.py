@@ -146,8 +146,8 @@ def _create_cluster_fit_forecast(_antecedent_params,
 
         # clustering, fitting, testing
         fvm.cluster()
-        fvm.fit()
-        fvm.forecast()
+        fvm.fit(n_points=fvm.train_data.shape[0])
+        fvm.forecast(n_points=fvm.train_data.shape[0])
 
         # calculating errors
         mse = mean_squared_error(fvm.h[:-1], fvm.train_data.values ** 2, squared=True)
