@@ -79,11 +79,6 @@ class FuzzyVolatilityModel:
             self._first_h_1d_current = None
             self.first_h_current = first_h.copy()
 
-        if self.n_points_fitting is not None and self.n_points_fitting > len(self.train_data):
-            raise ValueError('`n_points_fitting` should not be greater than '
-                             '`len(train_data) - max(p, q)`; '
-                             f'got {self.n_points_fitting} > {len(self.train_data) - self.starting_index}')
-
         # clusters parameters
         self._clusters_parameters_hist = []
         self.clusters_parameters_hist = DataFrame(dtype=float).copy()
