@@ -4,18 +4,20 @@ from typing import Union
 from pandas import Series, DataFrame, concat
 from numpy import array, diag, concatenate, arange, array_str, inf
 from scipy.optimize import least_squares, differential_evolution
-from IPython.core.debugger import set_trace
 
 from clusterization import cluster_data, calc_gaussian_membership_degrees
 from clusterization.ets import update_antecedent_part as ets_update_antecedent_part
 from clusterization.all_methods import CLUSTERING_METHODS
+from consequent_estimators import re_estimate_params_plain_rls, initialize_rls_params, \
+    ets_new_cluster_re_estimate_parameters
 from local_models import calc_cond_var_fuzzy
 from local_models.garch import PAST_H_TYPE_DEFAULT, PAST_H_TYPES
-from auxiliary import unpack_1d_parameters, pack_1d_parameters
+from auxiliary import unpack_1d_parameters, pack_1d_parameters, unpack_1d_params_cbc, pack_1d_params_cbc
 
 module_logger = logging.getLogger(__name__)
 
-OPTIMIZATION_ALGORITHMS = ['ls', 'differential evolution']
+OPTIMIZATION_ALGORITHMS = ['ls', 'differential evolution', 'rls']
+RLS_OMEGA_DEFAULT = 1e4
 
 
 class FuzzyVolatilityModel:
@@ -36,7 +38,8 @@ class FuzzyVolatilityModel:
                  optimization: str = 'ls',
                  optimization_parameters: dict = None,
                  clustered_space_dim: int = None,
-                 past_h_type: str = PAST_H_TYPE_DEFAULT
+                 past_h_type: str = PAST_H_TYPE_DEFAULT,
+                 rls_omega: float = RLS_OMEGA_DEFAULT
                  ):
         self.logger = logging.getLogger(module_logger.name + '.' + type(self).__name__)
         self.logger.info(f'Creating an instance of {self.logger.name}')
@@ -181,6 +184,13 @@ class FuzzyVolatilityModel:
         elif optimization == 'differential evolution':
             self._fit = self._fit_de
             self.bounds = array(self.bounds).T  # scipy's `differential_evolution` takes bounds in different form
+        elif optimization.lower() == 'rls':
+            self._fit = self._fit_rls
+
+            self.rls_cov: array = None
+            self._rls_cov_hist: list = []
+
+            self.rls_omega = rls_omega
         else:
             raise ValueError(f'Optimization algorithms other than {OPTIMIZATION_ALGORITHMS} are not supported; '
                              f'got {optimization}')
@@ -291,7 +301,7 @@ class FuzzyVolatilityModel:
 
         if self.n_clusters != len(focals_new):
             self.n_clusters = len(focals_new)
-            self.logger.debug(f'new # of clusters: {self.n_clusters}')
+            self.logger.info(f'new # of clusters: {self.n_clusters}')
 
             _new_cluster_alpha_0_ini = self.consequent_parameters_ini['alpha_0'].mean()
             self.consequent_parameters_ini['alpha_0'] = \
@@ -309,11 +319,13 @@ class FuzzyVolatilityModel:
                 self.bounds = self._add_bound(self.bounds, self.n_clusters)
             elif self.optimization == 'differential evolution':
                 self.bounds = self._add_bound(self.bounds.T, self.n_clusters).T.copy()
+            elif self.optimization.lower() == 'rls':
+                pass
             else:
                 raise NotImplementedError(f'bounds recalculation for optimization of type {self.optimization} '
                                           f'is not implemented')
 
-            bounds_str = array_str(self.bounds, max_line_width=inf).replace('\n', '')
+            bounds_str = array_str(array(self.bounds), max_line_width=inf).replace('\n', '')
             self.logger.debug(f"""new bounds = {bounds_str}""")
 
         cov_matrices = [self.cov_matrix for _ in range(self.n_clusters)]
@@ -321,7 +333,8 @@ class FuzzyVolatilityModel:
         self.membership_degrees_current = calc_gaussian_membership_degrees(
             self.data_to_cluster.iloc[-1],
             focals_new,
-            cov_matrices
+            cov_matrices,
+            normalize=self.normalize
         )
 
         self._clusters_parameters_hist.append(self.clusters_parameters_current)
@@ -407,6 +420,58 @@ class FuzzyVolatilityModel:
 
         self.logger.debug('Fitting is completed')
 
+    def _fit_rls(self):
+        logger = logging.getLogger(self.logger.name + '._fit_rls')
+
+        params_curr = pack_1d_params_cbc(self.alpha_0, self.alpha, self.beta)
+
+        if self._n_clusters_hist[-2] == self._n_clusters_hist[-1]:
+            # # of clusters didn't change
+            logger.debug('# of clusters unchanged, using plain RLS for estimation')
+
+            coeffs_curr = \
+                array([
+                    array([1, self.train_data[-1] ** 2, self.h_fuzzy[-1, i]]) * self.membership_degrees_current[i]
+                    for i in range(self.n_clusters)
+                ]).flatten().copy()
+            self.rls_cov, params = re_estimate_params_plain_rls(params_prev=params_curr,
+                                                                cov_prev=self.rls_cov,
+                                                                y_new=self.train_data.iloc[-1],
+                                                                coeffs_prev=coeffs_curr)
+        elif self._n_clusters_hist[-2] + 1 == self._n_clusters_hist[-1]:
+            # # of clusters increased by 1
+            logger.debug('# of clusters increased by 1, using eTS-based algorithm for estimation')
+
+            self.rls_cov, params = ets_new_cluster_re_estimate_parameters(params_prev=params_curr,
+                                                                          cov_prev=self.rls_cov,
+                                                                          weights=self.membership_degrees_current[:-1],
+                                                                          n_params_in_a_rule=self.p + self.q + 1,
+                                                                          omega=self.rls_omega)
+        else:
+            raise ValueError('RLS can only handle when # clusters increases by not more than 1; '
+                             f'got prev # clusters = {self._n_clusters_hist[-2]}, '
+                             f'new # clusters = {self._n_clusters_hist[-1]}')
+
+        self.alpha_0, self.alpha, self.beta = unpack_1d_params_cbc(params,
+                                                                   p=self.p,
+                                                                   q=self.q,
+                                                                   n_clusters=self.n_clusters)
+
+        self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
+        self._rls_cov_hist.append(self.rls_cov)
+
+    def initialize_rls(self):
+        self.rls_cov, params = initialize_rls_params(n_clusters=self.n_clusters,
+                                                     n_params_in_a_rule=self.p + self.q + 1,
+                                                     omega=self.rls_omega)
+        self.alpha_0, self.alpha, self.beta = unpack_1d_params_cbc(params,
+                                                                   p=self.p,
+                                                                   q=self.q,
+                                                                   n_clusters=self.n_clusters)
+
+        self._parameters_hist.append({'alpha_0': self.alpha_0, 'alpha': self.alpha, 'beta': self.beta})
+        self._rls_cov_hist.append(self.rls_cov)
+
     def forecast(self, n_points: int = None):
         _fitting_slice_ini = self._fitting_slice
         self._fitting_slice = slice(-n_points if n_points is not None else None, None)
@@ -475,7 +540,7 @@ class FuzzyVolatilityModel:
 
         # imitating live daily algorithm work
         for date in test_data.index:
-            self.logger.debug(f'feed_daily_data: new iteration @ {date}')
+            self.logger.info(f'feed_daily_data: new iteration @ {date}')
 
             observation = test_data.loc[date]
             data_to_cluster_point = data_to_cluster.loc[date]
