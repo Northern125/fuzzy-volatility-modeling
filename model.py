@@ -114,7 +114,8 @@ class FuzzyVolatilityModel:
         self.normalize = normalize
 
         # clustering algorithm
-        if self.clusterization_method == 'gaussian' or self.clusterization_method == 'trapezoidal':
+        if self.clusterization_method == 'gaussian' or self.clusterization_method == 'trapezoidal' \
+                or type(self.clusterization_method) is list or type(self.clusterization_method) is array:
             self.cluster = self._cluster
         elif self.clusterization_method == 'eTS':
             self.cluster = self._cluster_ets
