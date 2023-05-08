@@ -365,7 +365,8 @@ class FuzzyVolatilityModel:
             self.train_data = train_data.copy()
 
         _fitting_slice_ini = self._fitting_slice
-        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+        if n_points is not None:
+            self._fitting_slice = slice(-n_points, None)
 
         self._fit()
 
@@ -469,7 +470,8 @@ class FuzzyVolatilityModel:
 
     def forecast(self, n_points: int = None):
         _fitting_slice_ini = self._fitting_slice
-        self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+        if n_points is not None:
+            self._fitting_slice = slice(-n_points, None)
 
         self._forecast()
 
@@ -518,7 +520,8 @@ class FuzzyVolatilityModel:
             # then do forecast before running the main algorithm
 
             _fitting_slice_ini = self._fitting_slice
-            self._fitting_slice = slice(-n_points if n_points is not None else None, None)
+            if n_points is not None:
+                self._fitting_slice = slice(-n_points if n_points is not None else None, None)
 
             self.forecast(n_points=n_points)
 
