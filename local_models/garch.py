@@ -6,12 +6,20 @@ PAST_H_TYPE_DEFAULT = 'aggregated'
 PAST_H_TYPES = (PAST_H_TYPE_DEFAULT, 'rule-wise')
 
 
-def calc_ht(alpha_0, alpha, beta, y_squared, h):
+def calc_ht(alpha_0: float,
+            alpha: array,
+            beta: array,
+            y_squared: array,
+            h: array) -> float:
     res = alpha_0 + (alpha * y_squared).sum() + (beta * h).sum()
     return res
 
 
-def calc_fuzzy_ht_aggregated(alpha_0, alpha, beta, y_squared, h,
+def calc_fuzzy_ht_aggregated(alpha_0: array,
+                             alpha: array,
+                             beta: array,
+                             y_squared: array,
+                             h: array,
                              weights: array,
                              ) -> array:
     """
@@ -20,13 +28,11 @@ def calc_fuzzy_ht_aggregated(alpha_0, alpha, beta, y_squared, h,
     :param alpha:
     :param beta:
     :param y_squared:
-    :param h: 1D or 2D array-like, depending on `past_h_type`. The past conditional variance values `h_{t-j}`
+    :param h: 1D or 2D numpy.array, depending on `past_h_type`. The past conditional variance values `h_{t-j}`
     :param weights:
     aggregated h values. If 'rule-wise': `h` should be 2 dimensional and contain rule-wise `h_{t-j}^(k)` values
-    :return: 1D array. Output of each cluster
+    :return: 1D numpy.array. Aggregated output of all clusters
     """
-    h = array(h).copy()
-
     n_clusters: int = len(weights)
 
     outputs = [
@@ -40,8 +46,13 @@ def calc_fuzzy_ht_aggregated(alpha_0, alpha, beta, y_squared, h,
     return output
 
 
-def calc_fuzzy_ht_rule_wise(alpha_0, alpha, beta, y_squared, h,
-                            n_clusters: int):
+def calc_fuzzy_ht_rule_wise(alpha_0: array,
+                            alpha: array,
+                            beta: array,
+                            y_squared: array,
+                            h: array,
+                            n_clusters: int
+                            ) -> array:
     """
 
     :param alpha_0:
@@ -52,8 +63,6 @@ def calc_fuzzy_ht_rule_wise(alpha_0, alpha, beta, y_squared, h,
     :param n_clusters:
     :return:
     """
-    h = array(h).copy()
-
     outputs = [
         calc_ht(alpha_0[j], alpha[:, j], beta[:, j], y_squared, h[:, j])
         for j in range(n_clusters)
@@ -84,12 +93,14 @@ def _calc_cond_var(alpha_0, alpha, beta, y_squared, first_h,
     y_len = len(y_squared)
     logger.debug(f'y_len = {y_len}')
 
-    for i in range(starting_index, y_len + 1):
-        y_slc = slice(i - q, i)
-        h_slc = slice(i - p, i)
-        h_t = calc_ht_function(alpha_0, alpha, beta, y_squared[y_slc], h[h_slc], **kwargs)
+    for t in range(starting_index, y_len + 1):
+        y_slc = slice(t - q, t)
+        h_slc = slice(t - p, t)
+        _y_squared = array(list(reversed(y_squared[y_slc])))
+        _h = array(list(reversed(h[h_slc])))
+        h_t = calc_ht_function(alpha_0, alpha, beta, _y_squared, _h, **kwargs)
         h.append(h_t)
-        logger.debug(f'New iteration; i = {i}: h_t = {h_t}, y_slc = {y_slc}, h_slc = {h_slc}, '
+        logger.debug(f'New iteration; t = {t}: h_t = {h_t}, y_slc = {y_slc}, h_slc = {h_slc}, '
                      f'h[h_slc] = {h[h_slc]}, y_squared[y_slc] =\n{y_squared[y_slc]}')
 
     h = array(h).copy()
