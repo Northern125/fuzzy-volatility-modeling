@@ -6,7 +6,7 @@ from itertools import product
 
 from .ets import update_antecedent_part
 from .gaussian import calc_gaussian_membership_degrees
-from membership_functions import calc_trapezoidal_membership_degrees
+from src.membership_functions import calc_trapezoidal_membership_degrees
 
 CLUSTERING_METHODS = ('gaussian', 'trapezoidal', 'eTS', 'eClustering')
 

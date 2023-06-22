@@ -1,5 +1,5 @@
 import logging
-from multivariate_normal_distribution import LongMultivariateNormal
+from src.multivariate_normal_distribution import LongMultivariateNormal
 from numpy import array
 
 

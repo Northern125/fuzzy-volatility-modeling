@@ -5,7 +5,7 @@ import pickle
 import os
 from pathlib import Path
 
-from antecedent_fitting import fit_antecedent_params
+from src.antecedent_fitting import fit_antecedent_params
 
 with open('config.json') as file:
     config = json.load(file)

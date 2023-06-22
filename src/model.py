@@ -5,14 +5,14 @@ from pandas import Series, DataFrame, concat
 from numpy import array, diag, concatenate, arange, array_str, inf
 from scipy.optimize import least_squares, differential_evolution
 
-from clusterization import cluster_data, calc_gaussian_membership_degrees
-from clusterization.ets import update_antecedent_part as ets_update_antecedent_part
-from clusterization.all_methods import CLUSTERING_METHODS
-from consequent_estimators import re_estimate_params_plain_rls, initialize_rls_params, \
+from src.clusterization import cluster_data, calc_gaussian_membership_degrees
+from src.clusterization.ets import update_antecedent_part as ets_update_antecedent_part
+from src.clusterization.all_methods import CLUSTERING_METHODS
+from src.consequent_estimators import re_estimate_params_plain_rls, initialize_rls_params, \
     ets_new_cluster_re_estimate_parameters
-from local_models import calc_cond_var_fuzzy
-from local_models.garch import PAST_H_TYPE_DEFAULT, PAST_H_TYPES
-from auxiliary import unpack_1d_parameters, pack_1d_parameters, unpack_1d_params_cbc, pack_1d_params_cbc
+from src.local_models import calc_cond_var_fuzzy
+from src.local_models import PAST_H_TYPE_DEFAULT, PAST_H_TYPES
+from src.utils import unpack_1d_parameters, pack_1d_parameters, unpack_1d_params_cbc, pack_1d_params_cbc
 
 module_logger = logging.getLogger(__name__)
 

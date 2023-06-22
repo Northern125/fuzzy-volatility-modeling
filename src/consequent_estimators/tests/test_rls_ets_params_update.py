@@ -1,7 +1,7 @@
 import unittest
 from numpy import array, diag
 
-from consequent_estimators.recursive_ls import ets_new_cluster_re_estimate_parameters
+from src.consequent_estimators.recursive_ls import ets_new_cluster_re_estimate_parameters
 
 
 class TestRLSeTSUpdate(unittest.TestCase):

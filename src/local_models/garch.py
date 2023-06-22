@@ -1,6 +1,6 @@
 from typing import Union
 
-from rules_related import combine_rules_outputs
+from src.rules_related import combine_rules_outputs
 from numpy import array, apply_along_axis
 import logging
 

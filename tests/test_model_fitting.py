@@ -5,7 +5,7 @@ from scipy.stats import norm
 from pandas import date_range, Series, Timestamp
 from numpy import random, array, float128
 
-from model import FuzzyVolatilityModel
+from src.model import FuzzyVolatilityModel
 
 
 # generating white noise

@@ -5,7 +5,7 @@ import pickle
 import os
 from pathlib import Path
 
-with open('config.json') as file:
+with open('../config.json') as file:
     config = json.load(file)
 
 RES_DIR = Path(config['files_folders']['research_results'])
