@@ -23,6 +23,7 @@ MD_DIR = Path(config['files_folders']['calculations_metaparams'])
 
 MD_FILE_NAME_CURRENT = 'current_fvm_eTS_metadata_mul.pkl'
 TESTED_MODEL_FILE_NAME = 'tested_ets_mul'
+SINGLE_OUT_FNAME = 'single_ets_res'
 
 script_name = os.path.basename(__file__).split('.')[0]
 
@@ -65,6 +66,12 @@ def do_single_input(metadata: dict):
             'exception': e,
             'traceback': traceback.format_exc()
         }
+
+    _cur_time = str(Timestamp.today())
+    _file_name = f'{SINGLE_OUT_FNAME}_{_cur_time}.pkl'.replace(' ', '_').replace(':', '-')
+    with open(OUTPUT / _file_name, 'wb') as _f:
+        pickle.dump((fvm, _desc, script_info), _f)
+
     return fvm, _desc, script_info
 
 
