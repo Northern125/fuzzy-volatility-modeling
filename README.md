@@ -1,4 +1,10 @@
-# Fuzzy Volatility Modeling
+# Versions
+- Python 3.9.7
+- Conda 4.14.0
+- IPython 8.4.0
+- Jupyter Notebook 6.4.12
+
+# Project overview
 This project contains a model for forecasting volatility of publicly traded financial instruments. The key component of the model is a fuzzy system.
 
 ## Fuzzy Systems
