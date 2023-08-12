@@ -2,7 +2,7 @@ import unittest
 
 from numpy import array
 
-from src.fuzzy_inference_systems.takagi_sugeno import TSFuzzyInferenceSystem
+from src.fuzzy_inference_systems.takagi_sugeno import TSFuzzyInferenceSystemBase
 
 
 class TSFISTestCase(unittest.TestCase):
@@ -17,10 +17,10 @@ class TSFISTestCase(unittest.TestCase):
         }
         data_to_cluster = array([1, 2])
 
-        fis = TSFuzzyInferenceSystem(membership_function='gaussian',
-                                     clusters_params=clusters_params,
-                                     data_to_cluster=data_to_cluster,
-                                     normalize=True)
+        fis = TSFuzzyInferenceSystemBase(membership_function='gaussian',
+                                         clusters_params=clusters_params,
+                                         data_to_cluster=data_to_cluster,
+                                         normalize=True)
         fis.input = array([1, 2, 3])
         fis.consequent_params = array([[10, 20, 30, 40],
                                        [10, 20, 30, 40]])

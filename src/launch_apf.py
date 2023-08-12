@@ -102,7 +102,7 @@ if __name__ == '__main__':
     data_to_cluster_train = data['data_to_cluster_train']
     data_to_cluster_test = data['data_to_cluster_test']
     cluster_sets_conjunction = data['cluster_sets_conjunction']
-    n_last_points_to_use_for_clustering = data['n_last_points_to_use_for_clustering']
+    n_last_points_to_use_for_clustering = data['n_last_pts_clustering']
     other_fvm_parameters = data['other_fvm_parameters']
 
     n_cluster_sets = len(data['clusterization_method'])

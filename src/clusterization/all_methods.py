@@ -85,9 +85,9 @@ def cluster_data(x: Union[list, DataFrame],
                          f'`len(parameters) = {len(parameters)}`')
     if n_last_points_to_use_for_clustering is not None and n_sets != len(n_last_points_to_use_for_clustering):
         raise ValueError(f'Lengths of `x` and `parameters` should coincide. Got `len(x) = {len(x)}`, '
-                         f'`len(n_last_points_to_use_for_clustering) = {len(n_last_points_to_use_for_clustering)}`')
+                         f'`len(n_last_pts_clustering) = {len(n_last_points_to_use_for_clustering)}`')
 
-    # replacing `parameters` & `n_last_points_to_use_for_clustering` if they are None
+    # replacing `parameters` & `n_last_pts_clustering` if they are None
     if parameters is None:
         parameters = [None for _ in range(n_sets)]
     if n_last_points_to_use_for_clustering is None:
@@ -209,7 +209,7 @@ def cluster_data_1d(x: Union[list, array, Series, DataFrame],
         if type(x) is not DataFrame:
             raise ValueError(f'`x` should be a pandas.DataFrame; got `type(x)` = {type(x)}')
         if n_last_points_to_use_for_clustering is not None:
-            raise ValueError(f'For clustering method {method} `n_last_points_to_use_for_clustering` should be None; '
+            raise ValueError(f'For clustering method {method} `n_last_pts_clustering` should be None; '
                              f'got {n_last_points_to_use_for_clustering}')
 
         sigma_prev = clusterization_parameters['sigma']
