@@ -131,6 +131,9 @@ class TSFuzzyInferenceSystemBase:
         if add_to_hist:
             self.output_hist.append(self.output)
 
+    def defuzzify_hist(self):
+        self.output_hist += self._defuzzify_hist(self.fuzzy_output_hist)
+
 
 class TSFuzzyInferenceSystem(TSFuzzyInferenceSystemBase):
     def __init__(self,
